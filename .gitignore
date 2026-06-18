@@ -14,3 +14,4 @@ build/
 .dagayn
 .dagayn/
 .env
+.data/

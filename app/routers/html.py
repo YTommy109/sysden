@@ -9,7 +9,7 @@ from app import table_service
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent.parent / "templates"))
-_md = MarkdownIt()
+_md = MarkdownIt().enable("table")
 
 
 @router.get("/", response_class=HTMLResponse)
