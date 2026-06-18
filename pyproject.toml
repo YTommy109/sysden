@@ -5,40 +5,30 @@ requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.136",
     "uvicorn[standard]>=0.46",
-    "sqlmodel>=0.0.22",
-    "asyncpg>=0.30",
-    "alembic>=1.13",
-    "anthropic>=0.40",
+    "openai>=1.0",
     "markdown-it-py>=3.0",
-    "sse-starlette>=2.1",
     "jinja2>=3.1",
     "python-multipart>=0.0.32",
+    "python-dotenv>=1.0",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "pytest-asyncio>=0.24",
     "pytest-cov",
     "httpx>=0.28",
     "ruff>=0.9",
     "ty",
-    "pre-commit",
     "taskipy>=1.13",
-    "testcontainers[postgres]>=4.0",
-    "pytest-playwright>=0.8.0",
-    "psycopg2-binary>=2.9.12",
 ]
 
 [tool.taskipy.tasks]
-setup      = "uv run pre-commit install --hook-type pre-commit --hook-type post-checkout"
-dev        = "uv run uvicorn app.main:app --reload --port 8000"
-test       = "uv run pytest -v --cov --cov-report=term-missing"
-"test:e2e" = "uv run pytest tests/e2e -v"
-migrate    = "uv run alembic upgrade head"
-lint       = "uv run ruff check ."
-format     = "uv run ruff format ."
-typecheck  = "uv run ty check"
+setup     = "uv run pre-commit install --hook-type pre-commit --hook-type post-checkout"
+dev       = "uv run uvicorn app.main:app --reload --port 8000"
+test      = "uv run pytest -v --cov --cov-report=term-missing"
+lint      = "uv run ruff check ."
+format    = "uv run ruff format ."
+typecheck = "uv run ty check"
 
 [tool.ruff]
 line-length = 100
@@ -50,10 +40,6 @@ mccabe.max-complexity = 10
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration"]
 pythonpath = ["."]
-asyncio_mode = "auto"
-
-[tool.ty.environment]
-python-version = "3.14"
 
 [tool.coverage.run]
 source = ["app"]

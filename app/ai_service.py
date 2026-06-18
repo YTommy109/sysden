@@ -1,95 +1,42 @@
-import re
-import uuid
+import os
 from typing import Optional
 
-import anthropic
-from sqlmodel.ext.asyncio.session import AsyncSession
+from openai import OpenAI
 
-from app import document_service
-from app.database import engine
-from app.event_bus import event_bus
+SYSTEM_PROMPT = """あなたはデータベーステーブル設計のアシスタントです。
+ユーザーの依頼に応じて、以下のヘッダーを持つ TSV 形式でテーブルのカラム定義を出力してください。
 
-_client: Optional[anthropic.Anthropic] = None
-_agent_id: Optional[str] = None
-
-
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic()
-    return _client
-
-SYSTEM_PROMPT = """あなたはシステム設計ドキュメントのアシスタントです。
-ユーザーの依頼に応じて、markdown + mermaid 形式のシステム設計書を生成または更新します。
+ヘッダー（タブ区切り、必須）:
+column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription
 
 出力規則:
-- 出力はドキュメント本文のみ。前置き・説明・コードブロック外のコメントは不要
-- 先頭は `# タイトル` の見出しで始める
-- 図（アーキテクチャ・シーケンス・ER・フロー等）は mermaid フェンスブロックで記述する
-- 既存ドキュメントの更新依頼では、変更箇所だけでなくドキュメント全体を返す
+- ヘッダー行 + データ行のみを出力。説明文・コードブロック記号は不要
+- nullable, pk, unique は YES または NO で記述
+- default が存在しない場合は空文字（タブのみ）
+- 日本語の説明を description に記載する
 """
 
 
-async def _ensure_agent() -> str:
-    """Lazily create the agent on first call and cache the ID."""
-    global _agent_id
-    if _agent_id is None:
-        agent = _get_client().beta.agents.create(
-            model="claude-opus-4-8",
-            name="sysden-assistant",
-            system=SYSTEM_PROMPT,
-        )
-        _agent_id = agent.id
-    return _agent_id
+def get_client() -> OpenAI:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY が設定されていません")
+    return OpenAI(api_key=api_key)
 
 
-def _extract_title(markdown: str) -> str:
-    match = re.search(r"^#\s+(.+)", markdown, re.MULTILINE)
-    return match.group(1).strip() if match else "無題のドキュメント"
+def generate_table_design(prompt: str, current_tsv: Optional[str] = None) -> str:
+    """AI にテーブル設計（TSV）を生成または更新させる。"""
+    user_message = prompt
+    if current_tsv:
+        user_message = f"現在のテーブル定義:\n{current_tsv}\n\n依頼: {prompt}"
 
-
-def _build_prompt(user_request: str, current_content: Optional[str]) -> str:
-    if current_content:
-        return f"現在のドキュメント:\n\n{current_content}\n\n---\n\n依頼: {user_request}"
-    return user_request
-
-
-async def run_ai_job(job_id: uuid.UUID) -> None:
-    async with AsyncSession(engine) as session:
-        job = await document_service.get_ai_job(session, job_id)
-        await document_service.update_ai_job_status(session, job_id, "running")
-
-        try:
-            agent_id = await _ensure_agent()
-            prompt = _build_prompt(job.prompt, None)
-            if job.document_id:
-                rev = await document_service.get_current_revision(session, job.document_id)
-                if rev:
-                    prompt = _build_prompt(job.prompt, rev.content)
-
-            c = _get_client()
-            agent_session = c.beta.agents.sessions.create(agent_id=agent_id)
-            turn = c.beta.agents.sessions.turns.create(
-                agent_id=agent_id,
-                session_id=agent_session.id,
-                messages=[{"role": "user", "content": prompt}],
-            )
-
-            markdown = "\n".join(block.text for block in turn.content if hasattr(block, "text"))
-
-            if job.document_id:
-                await document_service.add_revision(session, job.document_id, markdown, job.id)
-                await document_service.update_ai_job_status(session, job_id, "succeeded")
-                await event_bus.publish(f"job_finished:{job_id}")
-                await event_bus.publish(f"document_updated:{job.document_id}")
-            else:
-                title = _extract_title(markdown)
-                doc = await document_service.create_document(session, job.project_id, title)
-                await document_service.add_revision(session, doc.id, markdown, job.id)
-                await document_service.update_ai_job_status(session, job_id, "succeeded")
-                await event_bus.publish(f"job_finished:{job_id}")
-                await event_bus.publish(f"document_updated:{doc.id}")
-
-        except Exception as exc:
-            await document_service.update_ai_job_status(session, job_id, "failed", error=str(exc))
-            await event_bus.publish(f"job_failed:{job_id}")
+    client = get_client()
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.2,
+    )
+    return response.choices[0].message.content or ""

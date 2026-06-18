@@ -1,17 +1,11 @@
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from dotenv import load_dotenv
 
-from fastapi import FastAPI
+load_dotenv()
 
-from app.routers import api, events, html
+from fastapi import FastAPI  # noqa: E402
 
+from app.routers import api, html  # noqa: E402
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    yield
-
-
-app = FastAPI(title="sysden", lifespan=lifespan)
+app = FastAPI(title="sysden")
 app.include_router(api.router)
-app.include_router(events.router)
 app.include_router(html.router)

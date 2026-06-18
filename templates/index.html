@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}テーブル一覧 — sysden{% endblock %}
+{% block content %}
+<h1>テーブル設計一覧</h1>
+
+<div id="table-list">
+  {% for name in tables %}
+  <div class="card">
+    <a href="/tables/{{ name }}"><strong>{{ name }}</strong></a>
+    <button hx-delete="/api/tables/{{ name }}"
+            hx-confirm="{{ name }} を削除しますか？"
+            hx-target="closest .card"
+            hx-swap="outerHTML"
+            style="float:right; background:#c00;">削除</button>
+  </div>
+  {% else %}
+  <p>テーブル設計はまだありません。</p>
+  {% endfor %}
+</div>
+
+<h2>AI に新規テーブル設計を依頼</h2>
+<form method="post" action="/api/tables">
+  <input name="name" placeholder="テーブル名（例: users）" required>
+  <textarea name="prompt" rows="3" placeholder="どんなテーブルか説明してください"></textarea>
+  <button type="submit">依頼を送信</button>
+</form>
+{% endblock %}

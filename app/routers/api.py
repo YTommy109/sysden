@@ -1,77 +1,44 @@
-import asyncio
-import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException
-from sqlmodel.ext.asyncio.session import AsyncSession
+from fastapi import APIRouter, Form, HTTPException
+from fastapi.responses import RedirectResponse
 
-from app import document_service
-from app.ai_service import run_ai_job
-from app.database import get_session
+from app import ai_service, table_service
+from app.config import get_data_dir
 
 router = APIRouter(prefix="/api")
 
 
-@router.post("/projects")
-async def create_project(
-    name: str = Form(...),
-    description: str = Form(""),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    project = await document_service.create_project(session, name, description)
-    return project.model_dump()
+@router.post("/tables")
+def create_table(
+    name: Annotated[str, Form()],
+    prompt: Annotated[str, Form()],
+) -> RedirectResponse:
+    if table_service.table_exists(name):
+        raise HTTPException(status_code=409, detail=f"Table '{name}' already exists")
+    tsv = ai_service.generate_table_design(prompt)
+    table_service.write_tsv(name, tsv)
+    return RedirectResponse(url=f"/tables/{name}", status_code=303)
 
 
-@router.post("/projects/{project_id}/ai-jobs", status_code=202)
-async def create_ai_job_for_project(
-    project_id: uuid.UUID,
-    prompt: str = Form(...),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
+@router.post("/tables/{name}")
+def update_table(
+    name: str,
+    prompt: Annotated[str, Form()],
+) -> RedirectResponse:
     try:
-        await document_service.get_project(session, project_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Project not found")
+        current_tsv = (get_data_dir() / f"{name}.tsv").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+    tsv = ai_service.generate_table_design(prompt, current_tsv)
+    table_service.write_tsv(name, tsv)
+    return RedirectResponse(url=f"/tables/{name}", status_code=303)
 
-    job = await document_service.create_ai_job(session, project_id, prompt, document_id=None)
-    asyncio.create_task(run_ai_job(job.id))
-    return {"job_id": str(job.id)}
 
-
-@router.post("/documents/{document_id}/ai-jobs", status_code=202)
-async def create_ai_job_for_document(
-    document_id: uuid.UUID,
-    prompt: str = Form(...),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
+@router.delete("/tables/{name}")
+def delete_table(name: str) -> dict[str, str]:
     try:
-        doc = await document_service.get_document(session, document_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    job = await document_service.create_ai_job(
-        session, doc.project_id, prompt, document_id=document_id
-    )
-    asyncio.create_task(run_ai_job(job.id))
-    return {"job_id": str(job.id)}
-
-
-@router.get("/ai-jobs/{job_id}")
-async def get_ai_job(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> dict:
-    try:
-        job = await document_service.get_ai_job(session, job_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return job.model_dump()
-
-
-@router.post("/documents/{document_id}/rollback")
-async def rollback_document(
-    document_id: uuid.UUID,
-    revision_id: uuid.UUID = Form(...),
-    session: AsyncSession = Depends(get_session),
-) -> dict:
-    try:
-        doc = await document_service.rollback_to_revision(session, document_id, revision_id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    return doc.model_dump()
+        table_service.delete_table(name)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+    return {"status": "deleted", "name": name}

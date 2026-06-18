@@ -1,92 +1,31 @@
-import html as html_module
-import re
-import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from markdown_it import MarkdownIt
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app import document_service
-from app.database import get_session
+from app import table_service
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
-_md = MarkdownIt("commonmark", {"html": False})
-
-
-def _render_markdown(content: str) -> str:
-    """markdown → HTML。mermaid フェンスは <pre class="mermaid"> に変換する。"""
-
-    def _mermaid_to_pre(m: re.Match) -> str:
-        return f'<pre class="mermaid">{html_module.escape(m.group(1))}</pre>'
-
-    content = re.sub(r"```mermaid\n(.*?)```", _mermaid_to_pre, content, flags=re.DOTALL)
-    return _md.render(content)
+templates = Jinja2Templates(directory=str(Path(__file__).parent.parent.parent / "templates"))
+_md = MarkdownIt()
 
 
 @router.get("/", response_class=HTMLResponse)
-async def projects_page(
-    request: Request, session: AsyncSession = Depends(get_session)
-) -> HTMLResponse:
-    projects = await document_service.get_projects(session)
-    return templates.TemplateResponse(request, "projects.html", {"projects": projects})
+def index(request: Request) -> HTMLResponse:
+    tables = table_service.list_tables()
+    return templates.TemplateResponse(request, "index.html", {"tables": tables})
 
 
-@router.get("/projects/{project_id}", response_class=HTMLResponse)
-async def project_detail_page(
-    project_id: uuid.UUID,
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-) -> HTMLResponse:
+@router.get("/tables/{name}", response_class=HTMLResponse)
+def table_detail(name: str, request: Request) -> HTMLResponse:
     try:
-        project = await document_service.get_project(session, project_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Project not found")
-    documents = await document_service.get_documents(session, project_id)
+        rows = table_service.read_tsv(name)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+    md_table = table_service.tsv_to_markdown(rows)
+    rendered = _md.render(md_table)
     return templates.TemplateResponse(
-        request,
-        "project_detail.html",
-        {"project": project, "documents": documents},
+        request, "table_detail.html", {"name": name, "rendered": rendered}
     )
-
-
-@router.get("/documents/{document_id}", response_class=HTMLResponse)
-async def document_viewer_page(
-    document_id: uuid.UUID,
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-) -> HTMLResponse:
-    try:
-        doc = await document_service.get_document(session, document_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Document not found")
-    rev = await document_service.get_current_revision(session, document_id)
-    revisions = await document_service.get_revisions(session, document_id)
-    rendered = _render_markdown(rev.content) if rev else ""
-    return templates.TemplateResponse(
-        request,
-        "document_viewer.html",
-        {
-            "doc": doc,
-            "rendered_html": rendered,
-            "revisions": revisions,
-            "current_rev": rev,
-        },
-    )
-
-
-@router.get("/documents/{document_id}/preview", response_class=HTMLResponse)
-async def document_preview(
-    document_id: uuid.UUID,
-    request: Request,
-    session: AsyncSession = Depends(get_session),
-) -> HTMLResponse:
-    try:
-        await document_service.get_document(session, document_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Document not found")
-    rev = await document_service.get_current_revision(session, document_id)
-    rendered = _render_markdown(rev.content) if rev else ""
-    return templates.TemplateResponse(request, "partials/preview.html", {"rendered_html": rendered})

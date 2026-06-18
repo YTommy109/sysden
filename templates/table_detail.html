@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} — sysden{% endblock %}
+{% block content %}
+<h1>{{ name }}</h1>
+<a href="/">← 一覧に戻る</a>
+
+<div id="table-view" style="margin-top: 1rem;">
+  {{ rendered | safe }}
+</div>
+
+<h2>AI に更新を依頼</h2>
+<form method="post" action="/api/tables/{{ name }}">
+  <textarea name="prompt" rows="3" placeholder="変更内容を説明してください"></textarea>
+  <button type="submit">更新を依頼</button>
+</form>
+{% endblock %}
