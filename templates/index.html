@@ -5,13 +5,14 @@
 
 <div id="table-list">
   {% for name in tables %}
-  <div class="card">
-    <a href="/tables/{{ name }}"><strong>{{ name }}</strong></a>
+  <div class="card" style="display:flex; align-items:center; gap:0.75rem;">
+    <strong style="flex:1;">{{ name }}</strong>
+    <a href="/tables/{{ name }}" style="padding:0.4rem 1rem; background:#1a1a2e; color:white; text-decoration:none; border-radius:3px;">参照・編集</a>
     <button hx-delete="/api/tables/{{ name }}"
             hx-confirm="{{ name }} を削除しますか？"
             hx-target="closest .card"
             hx-swap="outerHTML"
-            style="float:right; background:#c00;">削除</button>
+            style="background:#c00; padding:0.4rem 0.75rem; border:none; color:white; cursor:pointer; border-radius:3px;">削除</button>
   </div>
   {% else %}
   <p>テーブル設計はまだありません。</p>
