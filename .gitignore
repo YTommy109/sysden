@@ -1,0 +1,15 @@
+.coverage
+htmlcov/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+.superpowers/
+.claude/settings.local.json
+.claude/settings.json.bak
+.worktrees/
+# Added by dagayn
+.dagayn
+.dagayn/
