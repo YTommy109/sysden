@@ -28,9 +28,7 @@ async def get_project(session: AsyncSession, project_id: uuid.UUID) -> Project:
     return project
 
 
-async def create_document(
-    session: AsyncSession, project_id: uuid.UUID, title: str
-) -> Document:
+async def create_document(session: AsyncSession, project_id: uuid.UUID, title: str) -> Document:
     doc = Document(project_id=project_id, title=title)
     session.add(doc)
     await session.commit()
@@ -54,9 +52,7 @@ async def get_document(session: AsyncSession, document_id: uuid.UUID) -> Documen
     return doc
 
 
-async def get_current_revision(
-    session: AsyncSession, document_id: uuid.UUID
-) -> Optional[Revision]:
+async def get_current_revision(session: AsyncSession, document_id: uuid.UUID) -> Optional[Revision]:
     doc = await session.get(Document, document_id)
     if not doc or not doc.current_revision_id:
         return None
@@ -65,9 +61,7 @@ async def get_current_revision(
 
 async def get_revisions(session: AsyncSession, document_id: uuid.UUID) -> list[Revision]:
     result = await session.exec(
-        select(Revision)
-        .where(Revision.document_id == document_id)
-        .order_by(Revision.rev_no.desc())
+        select(Revision).where(Revision.document_id == document_id).order_by(Revision.rev_no.desc())
     )
     return list(result.all())
 
@@ -83,9 +77,7 @@ async def add_revision(
         raise ValueError(f"Document {document_id} not found")
 
     result = await session.exec(
-        select(Revision)
-        .where(Revision.document_id == document_id)
-        .order_by(Revision.rev_no.desc())
+        select(Revision).where(Revision.document_id == document_id).order_by(Revision.rev_no.desc())
     )
     latest = result.one_or_none()
     next_rev_no = (latest.rev_no + 1) if latest else 1

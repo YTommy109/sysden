@@ -1,10 +1,10 @@
 import uuid
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlmodel import select
+from unittest.mock import AsyncMock, MagicMock
 
-from app.models import Project, Document, Revision, AiJob
+import pytest
+
 from app import document_service
+from app.models import Document, Revision
 
 
 @pytest.fixture
@@ -73,16 +73,12 @@ async def test_rollback_updates_current_revision_id(mock_session):
     mock_doc = Document(
         id=doc_id, project_id=uuid.uuid4(), title="T", current_revision_id=old_rev_id
     )
-    mock_rev = Revision(
-        id=target_rev_id, document_id=doc_id, rev_no=1, content="# Old"
-    )
+    mock_rev = Revision(id=target_rev_id, document_id=doc_id, rev_no=1, content="# Old")
     mock_session.get = AsyncMock(side_effect=[mock_doc, mock_rev])
     mock_session.commit = AsyncMock()
     mock_session.refresh = AsyncMock()
 
-    result = await document_service.rollback_to_revision(
-        mock_session, doc_id, target_rev_id
-    )
+    result = await document_service.rollback_to_revision(mock_session, doc_id, target_rev_id)
 
     assert result.current_revision_id == target_rev_id
     mock_session.commit.assert_awaited_once()

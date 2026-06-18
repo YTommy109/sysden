@@ -1,6 +1,7 @@
 import uuid
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.models import AiJob, Document, Revision
 
@@ -14,6 +15,7 @@ async def test_initialize_agent_sets_agent_id():
         mock_client.beta.agents.create = MagicMock(return_value=mock_agent)
 
         import app.ai_service as ai_svc
+
         ai_svc._agent_id = None
         await ai_svc.initialize_agent()
 
@@ -35,9 +37,7 @@ async def test_run_ai_job_success():
         model="claude-opus-4-8",
     )
     mock_doc = Document(id=doc_id, project_id=project_id, title="Test Doc")
-    mock_rev = Revision(
-        id=uuid.uuid4(), document_id=doc_id, rev_no=1, content="# Old"
-    )
+    mock_rev = Revision(id=uuid.uuid4(), document_id=doc_id, rev_no=1, content="# Old")
 
     mock_turn = MagicMock()
     mock_block = MagicMock()
@@ -55,12 +55,8 @@ async def test_run_ai_job_success():
         patch("app.ai_service.event_bus") as mock_bus,
         patch("app.ai_service.document_service") as mock_ds,
     ):
-        mock_client.beta.agents.sessions.create = MagicMock(
-            return_value=mock_agent_session
-        )
-        mock_client.beta.agents.sessions.turns.create = MagicMock(
-            return_value=mock_turn
-        )
+        mock_client.beta.agents.sessions.create = MagicMock(return_value=mock_agent_session)
+        mock_client.beta.agents.sessions.turns.create = MagicMock(return_value=mock_turn)
         mock_bus.publish = AsyncMock()
         mock_ds.get_ai_job = AsyncMock(return_value=mock_job)
         mock_ds.update_ai_job_status = AsyncMock(return_value=mock_job)
@@ -68,7 +64,10 @@ async def test_run_ai_job_success():
         mock_ds.get_current_revision = AsyncMock(return_value=mock_rev)
         mock_ds.add_revision = AsyncMock(
             return_value=Revision(
-                id=uuid.uuid4(), document_id=doc_id, rev_no=2, content="# Updated Doc\n\nContent here."
+                id=uuid.uuid4(),
+                document_id=doc_id,
+                rev_no=2,
+                content="# Updated Doc\n\nContent here.",
             )
         )
 
@@ -78,11 +77,10 @@ async def test_run_ai_job_success():
         MockSession.return_value = ctx
 
         import app.ai_service as ai_svc
+
         await ai_svc.run_ai_job(job_id)
 
-        mock_ds.update_ai_job_status.assert_any_await(
-            mock_session_obj, job_id, "running"
-        )
+        mock_ds.update_ai_job_status.assert_any_await(mock_session_obj, job_id, "running")
         mock_ds.add_revision.assert_awaited_once()
         mock_bus.publish.assert_awaited()
 
@@ -108,9 +106,7 @@ async def test_run_ai_job_failure_records_error():
         patch("app.ai_service.event_bus") as mock_bus,
         patch("app.ai_service.document_service") as mock_ds,
     ):
-        mock_client.beta.agents.sessions.create = MagicMock(
-            side_effect=Exception("API error")
-        )
+        mock_client.beta.agents.sessions.create = MagicMock(side_effect=Exception("API error"))
         mock_bus.publish = AsyncMock()
         mock_ds.get_ai_job = AsyncMock(return_value=mock_job)
         mock_ds.update_ai_job_status = AsyncMock(return_value=mock_job)
@@ -122,6 +118,7 @@ async def test_run_ai_job_failure_records_error():
         MockSession.return_value = ctx
 
         import app.ai_service as ai_svc
+
         await ai_svc.run_ai_job(job_id)
 
         mock_ds.update_ai_job_status.assert_any_await(

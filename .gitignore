@@ -13,3 +13,4 @@ build/
 # Added by dagayn
 .dagayn
 .dagayn/
+.env

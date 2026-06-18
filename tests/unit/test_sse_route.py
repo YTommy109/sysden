@@ -8,10 +8,22 @@ from fastapi.routing import APIRoute
 def test_events_route_is_registered() -> None:
     # Remove cached app module to force fresh import
     for key in list(sys.modules.keys()):
-        if key.startswith("app"):
+        if key.startswith("app") or key.startswith("sqlmodel"):
             del sys.modules[key]
 
-    with patch("app.ai_service.initialize_agent", new_callable=AsyncMock):
+    # Patch before importing to avoid initialization errors
+    with (
+        patch("anthropic.Anthropic"),
+        patch("app.ai_service.initialize_agent", new_callable=AsyncMock),
+    ):
+        # Clear SQLModel registry if it exists
+        try:
+            from sqlmodel import SQLModel
+
+            SQLModel.metadata.clear()
+        except Exception:
+            pass
+
         from app.main import app
 
         # Collect all paths from the app's routes

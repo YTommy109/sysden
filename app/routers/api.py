@@ -26,9 +26,7 @@ class RollbackRequest(BaseModel):
 
 
 @router.post("/projects")
-async def create_project(
-    body: ProjectCreate, session: AsyncSession = Depends(get_session)
-) -> dict:
+async def create_project(body: ProjectCreate, session: AsyncSession = Depends(get_session)) -> dict:
     project = await document_service.create_project(session, body.name, body.description)
     return project.model_dump()
 
@@ -44,9 +42,7 @@ async def create_ai_job_for_project(
     except ValueError:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    job = await document_service.create_ai_job(
-        session, project_id, body.prompt, document_id=None
-    )
+    job = await document_service.create_ai_job(session, project_id, body.prompt, document_id=None)
     asyncio.create_task(run_ai_job(job.id))
     return {"job_id": str(job.id)}
 
@@ -70,9 +66,7 @@ async def create_ai_job_for_document(
 
 
 @router.get("/ai-jobs/{job_id}")
-async def get_ai_job(
-    job_id: uuid.UUID, session: AsyncSession = Depends(get_session)
-) -> dict:
+async def get_ai_job(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> dict:
     try:
         job = await document_service.get_ai_job(session, job_id)
     except ValueError:
@@ -87,9 +81,7 @@ async def rollback_document(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     try:
-        doc = await document_service.rollback_to_revision(
-            session, document_id, body.revision_id
-        )
+        doc = await document_service.rollback_to_revision(session, document_id, body.revision_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return doc.model_dump()

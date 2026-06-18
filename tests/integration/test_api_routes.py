@@ -19,9 +19,7 @@ def test_create_project_missing_name(client: TestClient) -> None:
 
 def test_create_ai_job_for_new_document(client: TestClient) -> None:
     # First create a project
-    proj = client.post(
-        "/api/projects", json={"name": "Proj", "description": ""}
-    ).json()
+    proj = client.post("/api/projects", json={"name": "Proj", "description": ""}).json()
     proj_id = proj["id"]
 
     with patch("app.routers.api.asyncio") as mock_asyncio:
@@ -36,9 +34,7 @@ def test_create_ai_job_for_new_document(client: TestClient) -> None:
 
 
 def test_get_ai_job_status(client: TestClient) -> None:
-    proj = client.post(
-        "/api/projects", json={"name": "P2", "description": ""}
-    ).json()
+    proj = client.post("/api/projects", json={"name": "P2", "description": ""}).json()
     proj_id = proj["id"]
 
     with patch("app.routers.api.asyncio") as mock_asyncio:

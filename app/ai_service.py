@@ -63,29 +63,21 @@ async def run_ai_job(job_id: uuid.UUID) -> None:
                 messages=[{"role": "user", "content": prompt}],
             )
 
-            markdown = "\n".join(
-                block.text for block in turn.content if hasattr(block, "text")
-            )
+            markdown = "\n".join(block.text for block in turn.content if hasattr(block, "text"))
 
             if job.document_id:
-                await document_service.add_revision(
-                    session, job.document_id, markdown, job.id
-                )
+                await document_service.add_revision(session, job.document_id, markdown, job.id)
                 await document_service.update_ai_job_status(session, job_id, "succeeded")
                 await event_bus.publish(f"job_finished:{job_id}")
                 await event_bus.publish(f"document_updated:{job.document_id}")
             else:
                 title = _extract_title(markdown)
-                doc = await document_service.create_document(
-                    session, job.project_id, title
-                )
+                doc = await document_service.create_document(session, job.project_id, title)
                 await document_service.add_revision(session, doc.id, markdown, job.id)
                 await document_service.update_ai_job_status(session, job_id, "succeeded")
                 await event_bus.publish(f"job_finished:{job_id}")
                 await event_bus.publish(f"document_updated:{doc.id}")
 
         except Exception as exc:
-            await document_service.update_ai_job_status(
-                session, job_id, "failed", error=str(exc)
-            )
+            await document_service.update_ai_job_status(session, job_id, "failed", error=str(exc))
             await event_bus.publish(f"job_failed:{job_id}")

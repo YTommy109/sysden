@@ -89,6 +89,4 @@ async def document_preview(
         raise HTTPException(status_code=404, detail="Document not found")
     rev = await document_service.get_current_revision(session, document_id)
     rendered = _render_markdown(rev.content) if rev else ""
-    return templates.TemplateResponse(
-        request, "partials/preview.html", {"rendered_html": rendered}
-    )
+    return templates.TemplateResponse(request, "partials/preview.html", {"rendered_html": rendered})
