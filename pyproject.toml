@@ -39,7 +39,6 @@ migrate    = "uv run alembic upgrade head"
 lint       = "uv run ruff check ."
 format     = "uv run ruff format ."
 typecheck  = "uv run ty check"
-login      = "claude auth login"
 
 [tool.ruff]
 line-length = 100

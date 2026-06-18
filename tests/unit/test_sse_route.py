@@ -1,6 +1,6 @@
 import sys
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 from fastapi.routing import APIRoute
 
@@ -12,10 +12,7 @@ def test_events_route_is_registered() -> None:
             del sys.modules[key]
 
     # Patch before importing to avoid initialization errors
-    with (
-        patch("anthropic.Anthropic"),
-        patch("app.ai_service.initialize_agent", new_callable=AsyncMock),
-    ):
+    with patch("anthropic.Anthropic"):
         # Clear SQLModel registry if it exists
         try:
             from sqlmodel import SQLModel

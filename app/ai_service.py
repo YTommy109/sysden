@@ -9,8 +9,15 @@ from app import document_service
 from app.database import engine
 from app.event_bus import event_bus
 
-client = anthropic.Anthropic()
+_client: Optional[anthropic.Anthropic] = None
 _agent_id: Optional[str] = None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _client
+    if _client is None:
+        _client = anthropic.Anthropic()
+    return _client
 
 SYSTEM_PROMPT = """あなたはシステム設計ドキュメントのアシスタントです。
 ユーザーの依頼に応じて、markdown + mermaid 形式のシステム設計書を生成または更新します。
@@ -23,14 +30,17 @@ SYSTEM_PROMPT = """あなたはシステム設計ドキュメントのアシス�
 """
 
 
-async def initialize_agent() -> None:
+async def _ensure_agent() -> str:
+    """Lazily create the agent on first call and cache the ID."""
     global _agent_id
-    agent = client.beta.agents.create(
-        model="claude-opus-4-8",
-        name="sysden-assistant",
-        system=SYSTEM_PROMPT,
-    )
-    _agent_id = agent.id
+    if _agent_id is None:
+        agent = _get_client().beta.agents.create(
+            model="claude-opus-4-8",
+            name="sysden-assistant",
+            system=SYSTEM_PROMPT,
+        )
+        _agent_id = agent.id
+    return _agent_id
 
 
 def _extract_title(markdown: str) -> str:
@@ -50,15 +60,17 @@ async def run_ai_job(job_id: uuid.UUID) -> None:
         await document_service.update_ai_job_status(session, job_id, "running")
 
         try:
+            agent_id = await _ensure_agent()
             prompt = _build_prompt(job.prompt, None)
             if job.document_id:
                 rev = await document_service.get_current_revision(session, job.document_id)
                 if rev:
                     prompt = _build_prompt(job.prompt, rev.content)
 
-            agent_session = client.beta.agents.sessions.create(agent_id=_agent_id)
-            turn = client.beta.agents.sessions.turns.create(
-                agent_id=_agent_id,
+            c = _get_client()
+            agent_session = c.beta.agents.sessions.create(agent_id=agent_id)
+            turn = c.beta.agents.sessions.turns.create(
+                agent_id=agent_id,
                 session_id=agent_session.id,
                 messages=[{"role": "user", "content": prompt}],
             )
