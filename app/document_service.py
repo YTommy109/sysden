@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -76,20 +77,32 @@ async def add_revision(
     if not doc:
         raise ValueError(f"Document {document_id} not found")
 
-    result = await session.exec(
-        select(Revision).where(Revision.document_id == document_id).order_by(Revision.rev_no.desc())
-    )
-    latest = result.one_or_none()
-    next_rev_no = (latest.rev_no + 1) if latest else 1
+    rev: Revision | None = None
+    for attempt in range(3):
+        result = await session.exec(
+            select(Revision)
+            .where(Revision.document_id == document_id)
+            .order_by(Revision.rev_no.desc())
+        )
+        latest = result.one_or_none()
+        next_rev_no = (latest.rev_no + 1) if latest else 1
 
-    rev = Revision(
-        document_id=document_id,
-        rev_no=next_rev_no,
-        content=content,
-        ai_job_id=ai_job_id,
-    )
-    session.add(rev)
-    await session.commit()
+        rev = Revision(
+            document_id=document_id,
+            rev_no=next_rev_no,
+            content=content,
+            ai_job_id=ai_job_id,
+        )
+        session.add(rev)
+        try:
+            await session.commit()
+            break
+        except IntegrityError:
+            await session.rollback()
+            if attempt == 2:
+                raise
+
+    assert rev is not None
     await session.refresh(rev)
 
     doc.current_revision_id = rev.id

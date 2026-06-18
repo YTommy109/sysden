@@ -11,10 +11,13 @@ class EventBus:
         return q
 
     def unsubscribe(self, q: asyncio.Queue[str]) -> None:
-        self._subscribers.remove(q)
+        try:
+            self._subscribers.remove(q)
+        except ValueError:
+            pass
 
     async def publish(self, event: str) -> None:
-        for q in self._subscribers:
+        for q in list(self._subscribers):
             await q.put(event)
 
 

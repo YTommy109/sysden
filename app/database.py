@@ -13,6 +13,7 @@ engine: AsyncEngine = create_async_engine(DATABASE_URL, echo=False)
 
 
 async def init_db() -> None:
+    """For test environments only. Production uses Alembic migrations."""
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 

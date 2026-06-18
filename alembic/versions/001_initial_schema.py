@@ -69,6 +69,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["document_id"], ["documents.id"]),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("document_id", "rev_no", name="uq_revisions_document_id_rev_no"),
     )
 
 

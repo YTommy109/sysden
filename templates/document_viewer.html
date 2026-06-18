@@ -46,7 +46,7 @@
         <span>Rev {{ rev.rev_no }} — {{ rev.created_at.strftime('%m/%d %H:%M') }}</span>
         {% if not (current_rev and rev.id == current_rev.id) %}
         <form hx-post="/api/documents/{{ doc.id }}/rollback"
-              hx-target="#preview-area" hx-swap="innerHTML"
+              hx-on::after-request="if(event.detail.successful) htmx.ajax('GET', '/documents/{{ doc.id }}/preview', {target:'#preview-area', swap:'innerHTML'})"
               style="display:inline;">
           <input type="hidden" name="revision_id" value="{{ rev.id }}">
           <button type="submit" style="font-size:0.75rem;">このバージョンに戻す</button>
@@ -75,8 +75,8 @@
   <button id="submit-btn"
     hx-post="/api/documents/{{ doc.id }}/ai-jobs"
     hx-include="#prompt-input"
-    hx-target="#job-status-inline"
-    hx-swap="innerHTML">送信</button>
+    hx-on::after-request="if(event.detail.successful){ document.getElementById('job-status-inline').textContent='AI が処理中...' }"
+    >送信</button>
   <span id="job-status-inline" style="font-size:0.85rem; color:#666;"></span>
 </div>
 <div style="height:80px;"></div><!-- 固定フッター分のスペーサー -->

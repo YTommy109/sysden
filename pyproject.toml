@@ -12,6 +12,7 @@ dependencies = [
     "markdown-it-py>=3.0",
     "sse-starlette>=2.1",
     "jinja2>=3.1",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]
@@ -38,6 +39,7 @@ migrate    = "uv run alembic upgrade head"
 lint       = "uv run ruff check ."
 format     = "uv run ruff format ."
 typecheck  = "uv run ty check"
+login      = "claude auth login"
 
 [tool.ruff]
 line-length = 100

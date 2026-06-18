@@ -13,10 +13,11 @@ async def _event_generator() -> AsyncGenerator[dict, None]:
     q = event_bus.subscribe()
     try:
         while True:
-            event = await asyncio.wait_for(q.get(), timeout=30.0)
-            yield {"data": event}
-    except asyncio.TimeoutError:
-        yield {"data": "ping"}
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=30.0)
+                yield {"data": event}
+            except asyncio.TimeoutError:
+                yield {"data": "ping"}
     except asyncio.CancelledError:
         pass
     finally:

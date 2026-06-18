@@ -1,3 +1,4 @@
+import html as html_module
 import re
 import uuid
 
@@ -12,17 +13,16 @@ from app.database import get_session
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
-_md = MarkdownIt()
+_md = MarkdownIt("commonmark", {"html": False})
 
 
 def _render_markdown(content: str) -> str:
     """markdown → HTML。mermaid フェンスは <pre class="mermaid"> に変換する。"""
-    content = re.sub(
-        r"```mermaid\n(.*?)```",
-        r'<pre class="mermaid">\1</pre>',
-        content,
-        flags=re.DOTALL,
-    )
+
+    def _mermaid_to_pre(m: re.Match) -> str:
+        return f'<pre class="mermaid">{html_module.escape(m.group(1))}</pre>'
+
+    content = re.sub(r"```mermaid\n(.*?)```", _mermaid_to_pre, content, flags=re.DOTALL)
     return _md.render(content)
 
 

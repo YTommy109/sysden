@@ -3,7 +3,8 @@
 {% block content %}
 <h1>プロジェクト一覧</h1>
 
-<form hx-post="/api/projects" hx-target="#project-list" hx-swap="afterbegin"
+<form hx-post="/api/projects"
+      hx-on::after-request="if(event.detail.successful) window.location.reload()"
       style="margin-bottom:1.5rem;">
   <input name="name" placeholder="プロジェクト名" required style="padding:0.5rem; width:300px;">
   <input name="description" placeholder="説明（任意）" style="padding:0.5rem; width:300px;">
