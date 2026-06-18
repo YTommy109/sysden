@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — sysden{% endblock %}
+{% block nav_extra %}<a href="/projects/{{ project.id }}">{{ project.name }}</a>{% endblock %}
+{% block content %}
+<h1>{{ project.name }}</h1>
+{% if project.description %}<p>{{ project.description }}</p>{% endif %}
+
+<h2>AI に新規ドキュメントを依頼</h2>
+<form hx-post="/api/projects/{{ project.id }}/ai-jobs"
+      hx-target="#job-status" hx-swap="innerHTML"
+      style="margin-bottom:1.5rem;">
+  <textarea name="prompt" rows="3" placeholder="作成したい設計書の内容を説明してください"
+    style="width:100%; padding:0.5rem; box-sizing:border-box;"></textarea>
+  <button type="submit" style="margin-top:0.5rem;">依頼を送信</button>
+</form>
+<div id="job-status"></div>
+
+<h2>ドキュメント一覧</h2>
+<ul>
+  {% for doc in documents %}
+  <li>
+    <a href="/documents/{{ doc.id }}">{{ doc.title }}</a>
+    <small style="color:#999;"> — {{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}</small>
+  </li>
+  {% else %}
+  <li>ドキュメントはまだありません。</li>
+  {% endfor %}
+</ul>
+{% endblock %}

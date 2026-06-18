@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}sysden{% endblock %}</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    nav { background: #1a1a2e; color: white; padding: 0.75rem 1rem; }
+    nav a { color: white; text-decoration: none; margin-right: 1rem; }
+    .mermaid { overflow-x: auto; }
+    #error-panel {
+      display: none;
+      border: 2px solid red;
+      padding: 1rem;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">sysden</a>
+    {% block nav_extra %}{% endblock %}
+  </nav>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js" defer></script>
+  <script src="https://unpkg.com/hyperscript.org@0.9.14" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <script>
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      sequence: { useMaxWidth: false },
+      er: { useMaxWidth: false },
+      flowchart: { useMaxWidth: false },
+      gantt: { useMaxWidth: false },
+      journey: { useMaxWidth: false },
+      pie: { useMaxWidth: false },
+      state: { useMaxWidth: false },
+      class: { useMaxWidth: false },
+    });
+    document.addEventListener('DOMContentLoaded', () => mermaid.run({ querySelector: '.mermaid' }));
+    mermaid.parseError = (err) => {
+      const panel = document.getElementById('error-panel');
+      if (panel) { panel.style.display = 'block'; panel.textContent = err; }
+    };
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
