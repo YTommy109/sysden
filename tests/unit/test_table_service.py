@@ -233,6 +233,74 @@ def test_tables_to_er_diagram_singular_table_match() -> None:
     assert "||--o{" in result
 
 
+def test_tables_to_er_diagram_description_table_reference() -> None:
+    # Arrange — 「種類識別子」カラムの description に「商品種類テーブル」と記述
+    product_types_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    products_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "種類識別子\tUUID\tNO\tNO\tNO\t\t商品種類テーブルの識別子を参照\n"
+    )
+    table_service.write_tsv("商品種類", product_types_tsv)
+    table_service.write_tsv("プロダクト", products_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — 商品種類 → プロダクト のリレーションが含まれる
+    assert "商品種類" in result
+    assert "プロダクト" in result
+    assert "||--o{" in result
+
+
+def test_tables_to_er_diagram_description_no_matching_table() -> None:
+    # Arrange — description に「注文テーブル」と書いてあるが注文テーブルは存在しない
+    products_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "種類識別子\tUUID\tNO\tNO\tNO\t\t注文テーブルの識別子\n"
+    )
+    table_service.write_tsv("プロダクト", products_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — 参照先テーブルがないのでリレーション線は出ない
+    assert "||--o{" not in result
+    assert "|o--o{" not in result
+
+
+def test_tables_to_er_diagram_id_suffix_takes_precedence() -> None:
+    # Arrange — _id サフィックスと description 両方でリレーションが検出可能な場合
+    #           _id サフィックスが優先される
+    users_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    categories_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    orders_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "user_id\tUUID\tNO\tNO\tNO\t\tcategoriesテーブルの参照\n"
+    )
+    table_service.write_tsv("users", users_tsv)
+    table_service.write_tsv("categories", categories_tsv)
+    table_service.write_tsv("orders", orders_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — _id サフィックスで users に解決される（description の categories ではない）
+    assert 'users ||--o{ orders : ""' in result
+    assert "categories" not in result.split("\n")[-1]
+
+
 def test_list_tables_excludes_index(sample_tsv: str) -> None:
     # Arrange — index.tsv が存在する状態
     table_service.write_tsv("users", sample_tsv)
