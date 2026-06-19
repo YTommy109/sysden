@@ -16,6 +16,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov",
+    "pytest-playwright>=0.6",
     "httpx>=0.28",
     "ruff>=0.9",
     "ty",
@@ -29,6 +30,7 @@ test      = "uv run pytest -v --cov --cov-report=term-missing"
 lint      = "uv run ruff check ."
 format    = "uv run ruff format ."
 typecheck = "uv run ty check"
+e2e       = "uv run pytest tests/e2e -v"
 
 [tool.ruff]
 line-length = 100
@@ -52,7 +54,7 @@ mccabe.max-complexity = 10
 "tests/**/*.py" = ["N806"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/unit", "tests/integration"]
+testpaths = ["tests/unit", "tests/integration", "tests/e2e"]
 pythonpath = ["."]
 
 [tool.coverage.run]
