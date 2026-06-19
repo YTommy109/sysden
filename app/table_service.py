@@ -1,4 +1,5 @@
 import csv
+import re
 
 from app.config import get_data_dir
 
@@ -171,22 +172,38 @@ def read_er_diagram() -> str:
     return content
 
 
-def _resolve_fk_target(column_name: str, table_names: set[str]) -> str | None:
-    """``_id`` サフィックスのカラム名から参照先テーブルを推定する。
+def _resolve_fk_target(
+    column_name: str,
+    table_names: set[str],
+    description: str = "",
+) -> str | None:
+    """カラム名または description から参照先テーブルを推定する。
+
+    以下の順で判定し、最初にヒットしたテーブル名を返す:
+
+    1. ``_id`` サフィックス（例: ``user_id`` → ``user`` / ``users``）
+    2. description 中の「〇〇テーブル」表記（例: 「商品種類テーブルの識別子」→ ``商品種類``）
 
     Args:
-        column_name: カラム名（例: ``user_id``）。
+        column_name: カラム名（例: ``user_id``、``種類識別子``）。
         table_names: 存在するテーブル名のセット。
+        description: カラムの説明文。
 
     Returns:
         一致したテーブル名。見つからなければ ``None``。
     """
-    if not column_name.endswith("_id"):
-        return None
-    prefix = column_name[: -len("_id")]
-    for candidate in (prefix, f"{prefix}s"):
-        if candidate in table_names:
-            return candidate
+    if column_name.endswith("_id"):
+        prefix = column_name[: -len("_id")]
+        for candidate in (prefix, f"{prefix}s"):
+            if candidate in table_names:
+                return candidate
+
+    match = re.search(r"(.+?)テーブル", description)
+    if match:
+        ref = match.group(1)
+        if ref in table_names:
+            return ref
+
     return None
 
 
@@ -212,7 +229,11 @@ def tables_to_er_diagram() -> str:
         except FileNotFoundError:
             continue
         for row in rows:
-            target = _resolve_fk_target(row.get("column_name", ""), name_set)
+            target = _resolve_fk_target(
+                row.get("column_name", ""),
+                name_set,
+                row.get("description", ""),
+            )
             if target is None or target == name:
                 continue
             nullable = row.get("nullable", "NO").upper() == "YES"
