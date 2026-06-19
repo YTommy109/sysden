@@ -84,8 +84,20 @@ def delete_table(name: str) -> None:
     path.unlink()
 
 
+_DISPLAY_HEADERS = ["カラム名", "型", "ユニーク", "説明"]
+
+
+def _build_description(row: dict[str, str]) -> str:
+    """description を説明セルとして返す。"""
+    return row.get("description", "")
+
+
 def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
-    """カラム定義の辞書リストを Markdown テーブルに変換する。
+    """カラム定義の辞書リストを日本語ヘッダーの Markdown テーブルに変換する。
+
+    TSV の 7 列（column_name, type, nullable, pk, unique, default, description）を
+    表示用の 4 列（カラム名, 型, ユニーク, 説明）にマッピングする。
+    必須（nullable=NO）は型に * プレフィックスで表現し、pk は太字、default は説明に統合する。
 
     Args:
         rows: カラム定義の辞書リスト。空の場合はプレースホルダを返す。
@@ -95,14 +107,24 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     """
     if not rows:
         return "_（カラム定義なし）_"
-    headers = list(rows[0].keys())
-    sep = ["---"] * len(headers)
+    sep = ["---"] * len(_DISPLAY_HEADERS)
     lines = [
-        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(_DISPLAY_HEADERS) + " |",
         "| " + " | ".join(sep) + " |",
     ]
     for row in rows:
-        cells = [row.get(h, "") for h in headers]
+        name = row.get("column_name", "")
+        if row.get("pk", "").upper() == "YES":
+            name = f"**{name}**"
+        col_type = row.get("type", "")
+        if row.get("nullable", "").upper() == "NO":
+            col_type = f'<span class="required">*</span> {col_type}'
+        cells = [
+            name,
+            col_type,
+            "○" if row.get("unique", "").upper() == "YES" else "",
+            _build_description(row),
+        ]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)
 
