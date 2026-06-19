@@ -45,8 +45,9 @@ def update_table(
 
 @router.post("/rebuild-index-tables")
 def rebuild_index_tables() -> RedirectResponse:
-    """テーブル一覧 (index.tsv) を再生成してトップページへリダイレクトする。"""
+    """テーブル一覧 (index.tsv) と ER 図 (index.mmd) を再生成してトップページへリダイレクトする。"""
     table_service.rebuild_index_tables()
+    table_service.rebuild_er_diagram_file()
     return RedirectResponse(url="/", status_code=303)
 
 

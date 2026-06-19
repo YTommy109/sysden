@@ -37,8 +37,8 @@ class TestIndexPageEmpty:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: 見出し "テーブル設計一覧" が表示される
-        expect(page.locator("h1")).to_have_text("テーブル設計一覧")
+        # Then: 見出し "テーブル一覧" が表示される
+        expect(page.locator("h1")).to_have_text("テーブル一覧")
 
     def test_shows_add_button(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
@@ -109,8 +109,8 @@ class TestIndexPageEmpty:
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: ER 図セクションが表示されない
-        expect(page.locator("#er-diagram")).not_to_be_visible()
+        # Then: ER 図の mermaid コンテンツが表示されない
+        expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
     def test_nav_link_to_home(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
@@ -125,7 +125,7 @@ class TestIndexPageEmpty:
 class TestIndexPageWithTables:
     """テーブルが存在する状態でのトップページ。"""
 
-    def test_shows_table_card(
+    def test_shows_table_row(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -134,11 +134,11 @@ class TestIndexPageWithTables:
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: "users" を含むカードが表示される
-        card = page.locator(".card", has_text="users")
-        expect(card).to_be_visible()
+        # Then: "users" を含む行が表示される
+        row = page.locator("#table-list tbody tr", has_text="users")
+        expect(row).to_be_visible()
 
-    def test_card_has_view_link(
+    def test_row_has_view_link(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -147,12 +147,12 @@ class TestIndexPageWithTables:
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: "参照・編集" リンクが /tables/users を指す
-        link = page.locator('.card a[href="/tables/users"]')
+        # Then: "詳細" リンクが /tables/users を指す
+        link = page.locator('#table-list a[href="/tables/users"]')
         expect(link).to_be_visible()
-        expect(link).to_have_text("参照・編集")
+        expect(link).to_have_text("詳細")
 
-    def test_card_has_delete_button(
+    def test_row_has_delete_button(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -162,8 +162,8 @@ class TestIndexPageWithTables:
         page.goto(base_url)
 
         # Then: "削除" ボタンが存在する
-        card = page.locator(".card", has_text="users")
-        delete_btn = card.locator("button", has_text="削除")
+        row = page.locator("#table-list tbody tr", has_text="users")
+        delete_btn = row.locator("button", has_text="削除")
         expect(delete_btn).to_be_visible()
 
     def test_empty_message_not_shown(
@@ -188,9 +188,9 @@ class TestIndexPageWithTables:
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: 両方のカードが表示される
-        expect(page.locator(".card", has_text="users")).to_be_visible()
-        expect(page.locator(".card", has_text="orders")).to_be_visible()
+        # Then: 両方の行が表示される
+        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
+        expect(page.locator("#table-list tbody tr", has_text="orders")).to_be_visible()
 
     def test_er_diagram_shown(
         self, page: Page, base_url: str, create_table: Callable[..., None]
@@ -286,8 +286,8 @@ class TestCreateTableDialog:
         # When: トップページに戻る
         page.goto(base_url)
 
-        # Then: 作成したテーブルのカードが表示される
-        expect(page.locator(".card")).to_be_visible()
+        # Then: 作成したテーブルの行が表示される
+        expect(page.locator("#table-list tbody tr")).to_be_visible()
 
 
 class TestRebuildButtons:
@@ -325,8 +325,27 @@ class TestRebuildButtons:
         page.locator('button:has-text("テーブル一覧の再作成")').click()
         page.wait_for_url("**/")
 
-        # Then: テーブルカードが表示される
-        expect(page.locator(".card", has_text="users")).to_be_visible()
+        # Then: テーブル行が表示される
+        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
+
+    def test_rebuild_index_tables_also_restores_er_diagram(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在するが index.tsv も index.mmd もない
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+        expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
+
+        # When: "テーブル一覧の再作成" ボタンをクリックする
+        page.locator('button:has-text("テーブル一覧の再作成")').click()
+        page.wait_for_url("**/")
+
+        # Then: ER 図も再作成されて表示される
+        expect(page.locator("#er-diagram .mermaid")).to_be_visible()
 
     def test_rebuild_er_diagram_restores_diagram(
         self, page: Page, base_url: str, e2e_data_dir: Path
@@ -338,14 +357,14 @@ class TestRebuildButtons:
         )
         (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
         page.goto(base_url)
-        expect(page.locator("#er-diagram")).not_to_be_visible()
+        expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
         # When: "ER 図の再作成" ボタンをクリックする
         page.locator('button:has-text("ER 図の再作成")').click()
         page.wait_for_url("**/")
 
         # Then: ER 図が表示される
-        expect(page.locator("#er-diagram")).to_be_visible()
+        expect(page.locator("#er-diagram .mermaid")).to_be_visible()
 
 
 class TestDeleteTable:
@@ -361,8 +380,8 @@ class TestDeleteTable:
         # When: 削除ボタンをクリックする
         dialog_messages: list[str] = []
         page.on("dialog", _capture_and_dismiss(dialog_messages))
-        card = page.locator(".card", has_text="users")
-        card.locator("button", has_text="削除").click()
+        row = page.locator("#table-list tbody tr", has_text="users")
+        row.locator("button", has_text="削除").click()
 
         # Then: 確認ダイアログが表示される
         page.wait_for_timeout(500)
@@ -370,7 +389,7 @@ class TestDeleteTable:
         assert "users" in dialog_messages[0]
         assert "削除" in dialog_messages[0]
 
-    def test_delete_cancel_keeps_card(
+    def test_delete_cancel_keeps_row(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在しトップページを表示中
@@ -379,14 +398,14 @@ class TestDeleteTable:
 
         # When: 削除ボタン → ダイアログでキャンセルする
         page.on("dialog", lambda d: d.dismiss())
-        card = page.locator(".card", has_text="users")
-        card.locator("button", has_text="削除").click()
+        row = page.locator("#table-list tbody tr", has_text="users")
+        row.locator("button", has_text="削除").click()
 
-        # Then: カードが残っている
+        # Then: 行が残っている
         page.wait_for_timeout(500)
-        expect(page.locator(".card", has_text="users")).to_be_visible()
+        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
 
-    def test_delete_accept_removes_card(
+    def test_delete_accept_removes_row(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在しトップページを表示中
@@ -395,8 +414,8 @@ class TestDeleteTable:
 
         # When: 削除ボタン → ダイアログで受け入れる
         page.on("dialog", lambda d: d.accept())
-        card = page.locator(".card", has_text="users")
-        card.locator("button", has_text="削除").click()
+        row = page.locator("#table-list tbody tr", has_text="users")
+        row.locator("button", has_text="削除").click()
 
-        # Then: "users" カードが DOM から消える
-        expect(page.locator(".card", has_text="users")).not_to_be_visible()
+        # Then: "users" 行が DOM から消える
+        expect(page.locator("#table-list tbody tr", has_text="users")).not_to_be_visible()
