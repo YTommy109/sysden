@@ -1,5 +1,7 @@
 import os
+from pathlib import Path
 
+import yaml
 from openai import OpenAI
 
 _STUB_TSV = (
@@ -7,18 +9,17 @@ _STUB_TSV = (
     "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
 )
 
-SYSTEM_PROMPT = """あなたはデータベーステーブル設計のアシスタントです。
-ユーザーの依頼に応じて、以下のヘッダーを持つ TSV 形式でテーブルのカラム定義を出力してください。
+_PROMPTS_PATH = Path(__file__).parent.parent / "prompts" / "ai_prompts.yaml"
 
-ヘッダー（タブ区切り、必須）:
-column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription
 
-出力規則:
-- ヘッダー行 + データ行のみを出力。説明文・コードブロック記号は不要
-- nullable, pk, unique は YES または NO で記述
-- default が存在しない場合は空文字（タブのみ）
-- 日本語の説明を description に記載する
-"""
+def _load_prompts() -> dict:
+    """プロンプト定義ファイルを読み込む。
+
+    Returns:
+        YAML からパースしたプロンプト定義辞書。
+    """
+    with _PROMPTS_PATH.open(encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
 
 def get_client() -> OpenAI:
@@ -49,17 +50,21 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
     if os.environ.get("SYSDEN_TEST_MODE") == "1":
         return _STUB_TSV
 
+    config = _load_prompts()["table_design"]
+
     user_message = prompt
     if current_tsv:
-        user_message = f"現在のテーブル定義:\n{current_tsv}\n\n依頼: {prompt}"
+        user_message = config["user_update_template"].format(
+            current_tsv=current_tsv, prompt=prompt
+        )
 
     client = get_client()
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model=config["model"],
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": config["system"]},
             {"role": "user", "content": user_message},
         ],
-        temperature=0.2,
+        temperature=config["temperature"],
     )
     return response.choices[0].message.content or ""
