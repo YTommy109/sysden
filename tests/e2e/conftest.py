@@ -35,7 +35,7 @@ def e2e_data_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.fixture(scope="session")
-def e2e_server(e2e_data_dir: Path) -> Generator[str, None, None]:
+def e2e_server(e2e_data_dir: Path) -> Generator[str]:
     """E2E テスト用の FastAPI サーバーをサブプロセスで起動する。"""
     port = _find_free_port()
     env = {
