@@ -26,6 +26,12 @@ if [ ! -e "$(pwd)/.claude" ]; then
   ln -sfn "$ROOT/.claude" "$(pwd)/.claude"
 fi
 
+# SYSDEN_DATA はシンボリックリンク（データディレクトリを共有）
+DATA_DIR="${SYSDEN_DATA:-$ROOT/.data}"
+if [ ! -e "$(pwd)/.data" ] && [ -e "$DATA_DIR" ]; then
+  ln -sfn "$DATA_DIR" "$(pwd)/.data"
+fi
+
 # .dagayn はコピー（ビルド済みグラフを再利用）
 if [ ! -e "$(pwd)/.dagayn" ] && [ -e "$ROOT/.dagayn" ]; then
   cp -r "$ROOT/.dagayn" "$(pwd)/.dagayn"
