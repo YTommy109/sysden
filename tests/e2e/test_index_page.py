@@ -138,7 +138,7 @@ class TestIndexPageWithTables:
         row = page.locator("#table-list tbody tr", has_text="users")
         expect(row).to_be_visible()
 
-    def test_row_has_view_link(
+    def test_table_name_links_to_detail(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -147,10 +147,10 @@ class TestIndexPageWithTables:
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: "詳細" リンクが /tables/users を指す
+        # Then: テーブル名が /tables/users へのリンクになっている
         link = page.locator('#table-list a[href="/tables/users"]')
         expect(link).to_be_visible()
-        expect(link).to_have_text("詳細")
+        expect(link).to_have_text("users")
 
     def test_row_has_delete_button(
         self, page: Page, base_url: str, create_table: Callable[..., None]
