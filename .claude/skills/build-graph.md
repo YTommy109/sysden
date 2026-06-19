@@ -11,9 +11,10 @@ Build or incrementally update the persistent code knowledge graph for this repos
 <!-- dagayn skill embedding context -->
 ## Installed Search Mode
 
-Installed in FTS-only mode (`--mode fts`).
+Installed in FTS-only mode (`--mode fts-only`).
 
 - Treat `semantic_search_nodes_tool` as keyword/FTS search, not vector semantic search.
+- `search_mode` should normally be `fts_only`; `keyword_fallback` means the FTS index is absent and should be refreshed before quality claims.
 - Prefer exact symbols, file names, graph relationships, and one targeted `rg` for literals.
 - Do not rebuild embeddings unless the user explicitly changes install mode.
 <!-- /dagayn skill embedding context -->
@@ -28,9 +29,9 @@ Installed in FTS-only mode (`--mode fts`).
    - For first-time graph setup: `build_or_update_graph_tool(full_rebuild=True, local_embedding="none")`
    - For routine updates: `build_or_update_graph_tool(local_embedding="none")`
    - Do not run embedding-enabled full rebuilds as a routine verification step.
-     When the MCP server was started with `--local-embedding low`, omitting
-     `local_embedding` may inherit that preset and trigger a large embedding
-     refresh. Pass `local_embedding="low"` only when the task explicitly requires
+     When the MCP server was started with `--local-embedding`, omitting
+     `local_embedding` may inherit that mode and trigger a large embedding
+     refresh. Pass `local_embedding="bge-m3"` only when the task explicitly requires
      embedding quality or hybrid-search freshness, and state that reason first.
 
 3. **Verify** by calling `list_graph_stats_tool` again and report the results:
