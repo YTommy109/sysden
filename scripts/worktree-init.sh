@@ -26,5 +26,9 @@ if [ ! -e "$(pwd)/.claude" ]; then
   ln -sfn "$ROOT/.claude" "$(pwd)/.claude"
 fi
 
+# .dagayn はコピー（ビルド済みグラフを再利用）
+if [ ! -e "$(pwd)/.dagayn" ] && [ -e "$ROOT/.dagayn" ]; then
+  cp -r "$ROOT/.dagayn" "$(pwd)/.dagayn"
+fi
+
 uv sync
-dagayn build --skip-flows
