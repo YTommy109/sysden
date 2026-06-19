@@ -149,3 +149,196 @@ def test_tables_to_er_diagram_multiple(sample_tsv: str) -> None:
     # Assert
     assert "users" in result
     assert "orders" in result
+
+
+def test_tables_to_er_diagram_fk_relationship() -> None:
+    # Arrange — orders.user_id が users テーブルを参照する
+    users_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    orders_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "user_id\tUUID\tNO\tNO\tNO\t\t注文者\n"
+    )
+    table_service.write_tsv("users", users_tsv)
+    table_service.write_tsv("orders", orders_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — users → orders のリレーションが含まれる
+    assert "users" in result
+    assert "orders" in result
+    assert "||--o{" in result
+
+
+def test_tables_to_er_diagram_nullable_fk() -> None:
+    # Arrange — orders.coupon_id が nullable で coupons を参照する
+    coupons_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    orders_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "coupon_id\tUUID\tYES\tNO\tNO\t\tクーポン\n"
+    )
+    table_service.write_tsv("coupons", coupons_tsv)
+    table_service.write_tsv("orders", orders_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — nullable なので |o--o{ になる
+    assert "|o--o{" in result
+
+
+def test_tables_to_er_diagram_no_matching_table() -> None:
+    # Arrange — category_id があるが categories テーブルは存在しない
+    products_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "category_id\tUUID\tNO\tNO\tNO\t\tカテゴリ\n"
+    )
+    table_service.write_tsv("products", products_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — 参照先がないのでリレーション線は出ない
+    assert "||--o{" not in result
+    assert "|o--o{" not in result
+
+
+def test_tables_to_er_diagram_singular_table_match() -> None:
+    # Arrange — items.order_id → order テーブル（単数形で一致）
+    order_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    items_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "order_id\tUUID\tNO\tNO\tNO\t\t注文\n"
+    )
+    table_service.write_tsv("order", order_tsv)
+    table_service.write_tsv("items", items_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert
+    assert "||--o{" in result
+
+
+def test_list_tables_excludes_index(sample_tsv: str) -> None:
+    # Arrange — index.tsv が存在する状態
+    table_service.write_tsv("users", sample_tsv)
+    table_service.rebuild_index()
+
+    # Act
+    result = table_service.list_tables()
+
+    # Assert — index は含まれない
+    assert "index" not in result
+    assert "users" in result
+
+
+def test_rebuild_index_creates_files(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_tsv("orders", sample_tsv)
+
+    # Act
+    table_service.rebuild_index()
+
+    # Assert — index.tsv と index.mmd が生成される
+    from app.config import get_data_dir
+
+    d = get_data_dir()
+    assert (d / "index.tsv").exists()
+    assert (d / "index.mmd").exists()
+
+
+def test_rebuild_index_empty() -> None:
+    # Arrange — テーブルが存在しない
+
+    # Act
+    table_service.rebuild_index()
+
+    # Assert — 空でもファイルは生成される（ヘッダのみ / 空文字列）
+    from app.config import get_data_dir
+
+    d = get_data_dir()
+    assert (d / "index.tsv").exists()
+    assert (d / "index.mmd").exists()
+
+
+def test_read_index_tables(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_tsv("orders", sample_tsv)
+    table_service.rebuild_index()
+
+    # Act
+    result = table_service.read_index_tables()
+
+    # Assert — ソート済みのテーブル名リスト
+    assert result == ["orders", "users"]
+
+
+def test_read_index_tables_empty() -> None:
+    # Arrange — テーブルなしで index を構築
+    table_service.rebuild_index()
+
+    # Act
+    result = table_service.read_index_tables()
+
+    # Assert
+    assert result == []
+
+
+def test_read_index_tables_no_file() -> None:
+    # Arrange — index.tsv が存在しない
+
+    # Act
+    result = table_service.read_index_tables()
+
+    # Assert — ファイルがなければ空リスト
+    assert result == []
+
+
+def test_read_er_diagram(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+    table_service.rebuild_index()
+
+    # Act
+    result = table_service.read_er_diagram()
+
+    # Assert
+    assert "erDiagram" in result
+    assert "users" in result
+
+
+def test_read_er_diagram_empty() -> None:
+    # Arrange — テーブルなしで index を構築
+    table_service.rebuild_index()
+
+    # Act
+    result = table_service.read_er_diagram()
+
+    # Assert
+    assert result == ""
+
+
+def test_read_er_diagram_no_file() -> None:
+    # Arrange — index.mmd が存在しない
+
+    # Act
+    result = table_service.read_er_diagram()
+
+    # Assert — ファイルがなければ空文字列
+    assert result == ""
