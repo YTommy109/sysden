@@ -62,6 +62,7 @@ uv run task typecheck # ty 型チェック
 - DB セッションは `async with AsyncSession(engine) as session:` パターンで使う（SQLModel の `AsyncSession` を利用）
 - `event_bus` は `asyncio.Queue` ベース。全処理がイベントループ内のため `call_soon_threadsafe` は不要
 - `except` 節で例外を再送出するときは `raise ... from err` または `raise ... from None` を使う
+- 値による分岐は `if-elif` チェーンではなく `match-case` 文を優先する
 
 ## docstring・コメント規約
 
