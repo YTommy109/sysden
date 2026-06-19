@@ -2,6 +2,11 @@ import os
 
 from openai import OpenAI
 
+_STUB_TSV = (
+    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+)
+
 SYSTEM_PROMPT = """あなたはデータベーステーブル設計のアシスタントです。
 ユーザーの依頼に応じて、以下のヘッダーを持つ TSV 形式でテーブルのカラム定義を出力してください。
 
@@ -41,6 +46,9 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
     Returns:
         生成されたカラム定義の TSV 文字列。
     """
+    if os.environ.get("SYSDEN_TEST_MODE") == "1":
+        return _STUB_TSV
+
     user_message = prompt
     if current_tsv:
         user_message = f"現在のテーブル定義:\n{current_tsv}\n\n依頼: {prompt}"

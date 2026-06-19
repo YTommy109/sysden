@@ -157,7 +157,7 @@ def test_create_table_via_ai(client: TestClient, mock_openai: None) -> None:
 - **ユニットテスト**: `tests/unit/` — pytest AAA スタイル、外部依存なし
   - ai_service のテストでは Agent SDK をモックする
 - **インテグレーションテスト**: `tests/integration/` — FastAPI `TestClient` + テスト用 PostgreSQL
-- **e2e**: `tests/e2e/` — Playwright（依頼送信→プレビュー更新、ロールバック、エラーパネル）
+- **E2E テスト**: `tests/e2e/` — Playwright（下記 E2E 規約を参照）
 - SSE エンドポイントのテストは `TestClient` の制限からルート登録確認のみ行う
 - `uv run pytest tests/unit -q` は 60 秒以内に完了すること
 
@@ -168,6 +168,50 @@ def test_events_route_is_registered():
     from fastapi.routing import APIRoute
     paths = [r.path for r in app.routes if isinstance(r, APIRoute)]
     assert "/events" in paths
+```
+
+## E2E テスト規約
+
+### スコープ・方針
+
+- ルーターが配線済みの画面のみテスト対象とする
+- BE 内部仕様の網羅性は不要。FE 部品の網羅性を重視する
+- 新しい画面・ルーターを追加したら、対応する E2E テストファイルも追加する
+
+### スタイル
+
+- **Gherkin (Given-When-Then)** コメントで各テストの意図を明示し、空行でブロック分けする
+- クラスで論理グループ化: `Test<Page><Category>` (例: `TestIndexPageEmpty`, `TestCreateTableForm`)
+- 関数名: `test_<what_is_being_tested>`
+- ファイル: `test_<page_name>.py`（ページ単位）、`test_navigation.py`（ページ間遷移フロー）
+
+### AI モック
+
+- `SYSDEN_TEST_MODE=1` 環境変数で `ai_service` をスタブ化する。実際の API は呼ばない
+- サーバーは `tests/e2e/conftest.py` の session スコープ fixture でサブプロセス起動する
+
+### データ分離
+
+- 各テスト前に `SYSDEN_DATA` 内の TSV を削除する autouse fixture `clean_data` でテスト間の独立性を保証する
+- テスト前提条件は `create_table` fixture（httpx POST）で API 経由で作成する
+
+### FE 部品チェックリスト（各画面で網羅すること）
+
+- 全 UI 要素の存在確認（ボタン、リンク、フォーム、入力欄、見出し）
+- 空状態のメッセージ表示 / 非表示
+- ボタン・リンクの属性（href, action, hx-* の結果）
+- フォーム送信後の遷移先
+- HTML バリデーション（required 属性）
+- htmx インタラクション（hx-delete + hx-confirm、DOM 更新）
+- ナビゲーションバーのリンク
+- ページタイトル (`<title>`)
+
+### 実行コマンド
+
+```bash
+uv run task e2e           # E2E のみ
+uv run pytest tests/e2e -v --headed  # ブラウザ表示ありデバッグ
+uv run task test          # 全テスト（unit + integration + e2e）
 ```
 
 ## 開発フロー（テスト先行）
