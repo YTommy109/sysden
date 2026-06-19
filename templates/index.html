@@ -22,6 +22,16 @@
   </form>
 </dialog>
 
+
+<div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+  <form method="post" action="/api/rebuild-index-tables" style="margin:0;">
+    <button type="submit" style="background:#555; font-size:0.85rem;">テーブル一覧の再作成</button>
+  </form>
+  <form method="post" action="/api/rebuild-er-diagram" style="margin:0;">
+    <button type="submit" style="background:#555; font-size:0.85rem;">ER 図の再作成</button>
+  </form>
+</div>
+
 {% if er_diagram %}
 <div id="er-diagram">
   <pre class="mermaid">{{ er_diagram }}</pre>

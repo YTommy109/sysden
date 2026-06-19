@@ -43,6 +43,20 @@ def update_table(
     return RedirectResponse(url=f"/tables/{name}", status_code=303)
 
 
+@router.post("/rebuild-index-tables")
+def rebuild_index_tables() -> RedirectResponse:
+    """テーブル一覧 (index.tsv) を再生成してトップページへリダイレクトする。"""
+    table_service.rebuild_index_tables()
+    return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/rebuild-er-diagram")
+def rebuild_er_diagram() -> RedirectResponse:
+    """ER 図 (index.mmd) を再生成してトップページへリダイレクトする。"""
+    table_service.rebuild_er_diagram_file()
+    return RedirectResponse(url="/", status_code=303)
+
+
 @router.delete("/tables/{name}")
 def delete_table(name: str) -> dict[str, str]:
     try:

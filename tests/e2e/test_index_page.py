@@ -1,6 +1,7 @@
 """GET / — テーブル一覧ページの E2E テスト。"""
 
 from collections.abc import Callable
+from pathlib import Path
 
 from playwright.sync_api import Dialog, Page, expect
 
@@ -287,6 +288,64 @@ class TestCreateTableDialog:
 
         # Then: 作成したテーブルのカードが表示される
         expect(page.locator(".card")).to_be_visible()
+
+
+class TestRebuildButtons:
+    """テーブル一覧・ER 図の再作成ボタン。"""
+
+    def test_rebuild_index_tables_button_visible(self, page: Page, base_url: str) -> None:
+        # Given/When: トップページにアクセスする
+        page.goto(base_url)
+
+        # Then: "テーブル一覧の再作成" ボタンが表示される
+        btn = page.locator('button:has-text("テーブル一覧の再作成")')
+        expect(btn).to_be_visible()
+
+    def test_rebuild_er_diagram_button_visible(self, page: Page, base_url: str) -> None:
+        # Given/When: トップページにアクセスする
+        page.goto(base_url)
+
+        # Then: "ER 図の再作成" ボタンが表示される
+        btn = page.locator('button:has-text("ER 図の再作成")')
+        expect(btn).to_be_visible()
+
+    def test_rebuild_index_tables_restores_list(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在するが index.tsv がない
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+        expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
+
+        # When: "テーブル一覧の再作成" ボタンをクリックする
+        page.locator('button:has-text("テーブル一覧の再作成")').click()
+        page.wait_for_url("**/")
+
+        # Then: テーブルカードが表示される
+        expect(page.locator(".card", has_text="users")).to_be_visible()
+
+    def test_rebuild_er_diagram_restores_diagram(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在するが index.mmd がない
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+        expect(page.locator("#er-diagram")).not_to_be_visible()
+
+        # When: "ER 図の再作成" ボタンをクリックする
+        page.locator('button:has-text("ER 図の再作成")').click()
+        page.wait_for_url("**/")
+
+        # Then: ER 図が表示される
+        expect(page.locator("#er-diagram")).to_be_visible()
 
 
 class TestDeleteTable:
