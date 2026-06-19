@@ -147,7 +147,7 @@ class TestTableDetailNavigation:
 
         # Then: トップページに遷移する
         page.wait_for_url(f"{base_url}/")
-        expect(page.locator("h1")).to_have_text("テーブル設計一覧")
+        expect(page.locator("h1")).to_have_text("テーブル一覧")
 
     def test_nav_logo_goes_to_index(
         self, page: Page, base_url: str, create_table: Callable[..., None]
@@ -161,7 +161,7 @@ class TestTableDetailNavigation:
 
         # Then: トップページに遷移する
         page.wait_for_url(f"{base_url}/")
-        expect(page.locator("h1")).to_have_text("テーブル設計一覧")
+        expect(page.locator("h1")).to_have_text("テーブル一覧")
 
 
 class TestTableDetailError:

@@ -2,7 +2,7 @@
 {% block title %}テーブル一覧 — sysden{% endblock %}
 {% block content %}
 <div style="display:flex; align-items:center; justify-content:space-between;">
-  <h1>テーブル設計一覧</h1>
+  <h1>テーブル一覧</h1>
   <button type="button"
           _="on click call #create-dialog.showModal()"
           style="height:fit-content;">テーブル追加</button>
@@ -22,35 +22,48 @@
   </form>
 </dialog>
 
-
-<div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-  <form method="post" action="/api/rebuild-index-tables" style="margin:0;">
-    <button type="submit" style="background:#555; font-size:0.85rem;">テーブル一覧の再作成</button>
-  </form>
-  <form method="post" action="/api/rebuild-er-diagram" style="margin:0;">
-    <button type="submit" style="background:#555; font-size:0.85rem;">ER 図の再作成</button>
-  </form>
-</div>
-
-{% if er_diagram %}
-<div id="er-diagram">
-  <pre class="mermaid">{{ er_diagram }}</pre>
-</div>
-{% endif %}
-
 <div id="table-list">
-  {% for name in tables %}
-  <div class="card" style="display:flex; align-items:center; gap:0.75rem;">
-    <strong style="flex:1;">{{ name }}</strong>
-    <a href="/tables/{{ name }}" style="padding:0.4rem 1rem; background:#1a1a2e; color:white; text-decoration:none; border-radius:3px;">参照・編集</a>
-    <button hx-delete="/api/tables/{{ name }}"
-            hx-confirm="{{ name }} を削除しますか？"
-            hx-target="closest .card"
-            hx-swap="outerHTML"
-            style="background:#c00; padding:0.4rem 0.75rem; border:none; color:white; cursor:pointer; border-radius:3px;">削除</button>
+  <div style="display:flex; justify-content:flex-end; margin-bottom:0.5rem;">
+    <form method="post" action="/api/rebuild-index-tables" style="margin:0;">
+      <button type="submit" style="background:#555; font-size:0.85rem;">テーブル一覧の再作成</button>
+    </form>
   </div>
+  {% if tables %}
+  <table class="striped">
+    <thead>
+      <tr><th>テーブル名</th><th style="width:9rem;"></th></tr>
+    </thead>
+    <tbody>
+      {% for name in tables %}
+      <tr>
+        <td><strong>{{ name }}</strong></td>
+        <td style="display:flex; gap:0.5rem; justify-content:flex-end;">
+          <a href="/tables/{{ name }}" style="padding:0.3rem 0.75rem; background:#1a1a2e; color:white; text-decoration:none; border-radius:3px; font-size:0.85rem;">詳細</a>
+          <button hx-delete="/api/tables/{{ name }}"
+                  hx-confirm="{{ name }} を削除しますか？"
+                  hx-target="closest tr"
+                  hx-swap="outerHTML"
+                  style="background:#c00; padding:0.3rem 0.75rem; border:none; color:white; cursor:pointer; border-radius:3px; font-size:0.85rem;">削除</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
   {% else %}
   <p>テーブル設計はまだありません。</p>
-  {% endfor %}
+  {% endif %}
+</div>
+
+<hr style="margin:2rem 0; border:none; border-top:1px solid #ddd;">
+
+<div id="er-diagram">
+  <div style="display:flex; justify-content:flex-end; margin-bottom:0.5rem;">
+    <form method="post" action="/api/rebuild-er-diagram" style="margin:0;">
+      <button type="submit" style="background:#555; font-size:0.85rem;">ER 図の再作成</button>
+    </form>
+  </div>
+  {% if er_diagram %}
+  <pre class="mermaid">{{ er_diagram }}</pre>
+  {% endif %}
 </div>
 {% endblock %}

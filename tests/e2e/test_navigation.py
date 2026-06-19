@@ -26,16 +26,16 @@ class TestEndToEndFlow:
         page.click('a[href="/"]:has-text("一覧に戻る")')
         page.wait_for_url(f"{base_url}/")
 
-        # Then: 作成したテーブルのカードが表示される
-        card = page.locator(".card", has_text=table_name)
-        expect(card).to_be_visible()
+        # Then: 作成したテーブルの行が表示される
+        row = page.locator("#table-list tbody tr", has_text=table_name)
+        expect(row).to_be_visible()
 
         # When: 削除ボタン → ダイアログで受け入れる
         page.on("dialog", lambda d: d.accept())
-        card.locator("button", has_text="削除").click()
+        row.locator("button", has_text="削除").click()
 
-        # Then: カードが消える
-        expect(page.locator(".card", has_text=table_name)).not_to_be_visible()
+        # Then: 行が消える
+        expect(page.locator("#table-list tbody tr", has_text=table_name)).not_to_be_visible()
 
         # When: ページを再読み込みする
         page.reload()
@@ -67,9 +67,9 @@ class TestEndToEndFlow:
         # Given: テーブル "users" が存在する
         create_table("users")
 
-        # When: トップページで "参照・編集" リンクをクリックする
+        # When: トップページで "詳細" リンクをクリックする
         page.goto(base_url)
-        page.click('.card a[href="/tables/users"]')
+        page.click('#table-list a[href="/tables/users"]')
 
         # Then: 詳細ページに遷移する
         page.wait_for_url("**/tables/users")
