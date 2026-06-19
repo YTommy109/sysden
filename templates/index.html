@@ -35,14 +35,13 @@
   {% if tables %}
   <table class="striped">
     <thead>
-      <tr><th>テーブル名</th><th style="width:9rem;"></th></tr>
+      <tr><th>テーブル名</th><th style="width:5rem;"></th></tr>
     </thead>
     <tbody>
       {% for name in tables %}
       <tr>
-        <td><strong>{{ name }}</strong></td>
-        <td style="display:flex; gap:0.5rem; justify-content:flex-end;">
-          <a href="/tables/{{ name }}" style="padding:0.3rem 0.75rem; background:#1a1a2e; color:white; text-decoration:none; border-radius:3px; font-size:0.85rem;">詳細</a>
+        <td><a href="/tables/{{ name }}">{{ name }}</a></td>
+        <td style="text-align:right;">
           <button hx-delete="/api/tables/{{ name }}"
                   hx-confirm="{{ name }} を削除しますか？"
                   hx-target="closest tr"
