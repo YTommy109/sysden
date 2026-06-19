@@ -1,7 +1,32 @@
 {% extends "base.html" %}
 {% block title %}テーブル一覧 — sysden{% endblock %}
 {% block content %}
-<h1>テーブル設計一覧</h1>
+<div style="display:flex; align-items:center; justify-content:space-between;">
+  <h1>テーブル設計一覧</h1>
+  <button type="button"
+          _="on click call #create-dialog.showModal()"
+          style="height:fit-content;">テーブル追加</button>
+</div>
+
+<dialog id="create-dialog">
+  <h2>AI に新規テーブル設計を依頼</h2>
+  <form method="post" action="/api/tables"
+        _="on keydown if event.key is 'Enter' and (event.metaKey or event.ctrlKey) halt the event then call me.requestSubmit()">
+    <textarea name="prompt" rows="7" placeholder="どんなテーブルか説明してください（例: ユーザー管理テーブルを作って）" required></textarea>
+    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+      <button type="button"
+              _="on click call #create-dialog.close()"
+              style="background:#666;">キャンセル</button>
+      <button type="submit">依頼を送信</button>
+    </div>
+  </form>
+</dialog>
+
+{% if er_diagram %}
+<div id="er-diagram">
+  <pre class="mermaid">{{ er_diagram }}</pre>
+</div>
+{% endif %}
 
 <div id="table-list">
   {% for name in tables %}
@@ -18,11 +43,4 @@
   <p>テーブル設計はまだありません。</p>
   {% endfor %}
 </div>
-
-<h2>AI に新規テーブル設計を依頼</h2>
-<form method="post" action="/api/tables">
-  <input name="name" placeholder="テーブル名（例: users）" required>
-  <textarea name="prompt" rows="3" placeholder="どんなテーブルか説明してください"></textarea>
-  <button type="submit">依頼を送信</button>
-</form>
 {% endblock %}

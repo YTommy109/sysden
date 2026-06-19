@@ -10,12 +10,15 @@ router = APIRouter(prefix="/api")
 
 @router.post("/tables")
 def create_table(
-    name: Annotated[str, Form()],
     prompt: Annotated[str, Form()],
+    name: Annotated[str | None, Form()] = None,
 ) -> RedirectResponse:
+    if name is None:
+        name, tsv = ai_service.create_table_design(prompt)
+    else:
+        tsv = ai_service.generate_table_design(prompt)
     if table_service.table_exists(name):
         raise HTTPException(status_code=409, detail=f"Table '{name}' already exists")
-    tsv = ai_service.generate_table_design(prompt)
     table_service.write_tsv(name, tsv)
     return RedirectResponse(url=f"/tables/{name}", status_code=303)
 

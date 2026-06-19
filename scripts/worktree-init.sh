@@ -13,9 +13,12 @@ fi
 
 ROOT="$(dirname "$COMMON_DIR")"
 
-# .envrc はコピー（worktree ごとに独立した環境変数を持てるように）
+# .envrc / .env はコピー（worktree ごとに独立した環境変数を持てるように）
 if [ ! -e "$(pwd)/.envrc" ] && [ -e "$ROOT/.envrc" ]; then
   cp "$ROOT/.envrc" "$(pwd)/.envrc"
+fi
+if [ ! -e "$(pwd)/.env" ] && [ -e "$ROOT/.env" ]; then
+  cp "$ROOT/.env" "$(pwd)/.env"
 fi
 
 # .claude はシンボリックリンク（設定を共有）

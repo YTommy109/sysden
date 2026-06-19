@@ -15,7 +15,10 @@ _md = MarkdownIt().enable("table")
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     tables = table_service.list_tables()
-    return templates.TemplateResponse(request, "index.html", {"tables": tables})
+    er_diagram = table_service.tables_to_er_diagram()
+    return templates.TemplateResponse(
+        request, "index.html", {"tables": tables, "er_diagram": er_diagram}
+    )
 
 
 @router.get("/tables/{name}", response_class=HTMLResponse)

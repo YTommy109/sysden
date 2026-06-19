@@ -9,7 +9,7 @@ class TestTableDetailDisplay:
     """テーブル詳細ページの表示要素。"""
 
     def test_shows_table_name_heading(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -21,7 +21,7 @@ class TestTableDetailDisplay:
         expect(page.locator("h1")).to_have_text("users")
 
     def test_shows_page_title(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -33,7 +33,7 @@ class TestTableDetailDisplay:
         expect(page).to_have_title("users — sysden")
 
     def test_shows_back_link(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -46,7 +46,7 @@ class TestTableDetailDisplay:
         expect(back_link).to_be_visible()
 
     def test_shows_rendered_table(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -66,7 +66,7 @@ class TestTableDetailDisplay:
         expect(table_view.locator('td:text-is("id")')).to_be_visible()
 
     def test_shows_update_form(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -86,7 +86,7 @@ class TestTableDetailDisplay:
         expect(form.locator('button[type="submit"]')).to_have_text("更新を依頼")
 
     def test_shows_update_heading(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -98,7 +98,7 @@ class TestTableDetailDisplay:
         expect(page.locator("h2", has_text="AI に更新を依頼")).to_be_visible()
 
     def test_nav_link_exists(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
         create_table("users")
@@ -114,7 +114,7 @@ class TestTableDetailUpdate:
     """テーブル更新フォームの操作。"""
 
     def test_update_redirects_to_same_page(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在し詳細ページを表示中
         create_table("users")
@@ -136,7 +136,7 @@ class TestTableDetailNavigation:
     """テーブル詳細ページからのナビゲーション。"""
 
     def test_back_link_goes_to_index(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
         create_table("users")
@@ -150,7 +150,7 @@ class TestTableDetailNavigation:
         expect(page.locator("h1")).to_have_text("テーブル設計一覧")
 
     def test_nav_logo_goes_to_index(
-        self, page: Page, base_url: str, create_table: Callable[[str, str], None]
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
         create_table("users")
