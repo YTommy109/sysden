@@ -50,15 +50,99 @@ uv run task typecheck # ty 型チェック
 - **行長**: 100 文字以内（Ruff 強制）
 - **複雑度**: 認知的複雑度 ≤ 10（Ruff C901 強制）
 - **import 順序**: Ruff I（isort 互換）で自動整理
+- **モダン構文**: Ruff UP（pyupgrade）で最新 Python 構文を強制（`Optional[X]` → `X | None` など）
+- **バグ検出**: Ruff B（flake8-bugbear）で一般的なバグパターンを検出
+- **簡潔化**: Ruff SIM（flake8-simplify）で不必要に複雑なコードを検出
+- **命名規約**: Ruff N（pep8-naming）で PEP 8 準拠の命名を強制
+- **print 禁止**: Ruff T20 で `print()` の残留を検出（ログは `logging` を使う）
 - **型チェック**: ty（pre-commit フック）
 - **テストカバレッジ**: 80% 以上（`fail_under = 80`）
 
 ## Python コーディング規約
 
-- 型アノテーションを必ず付ける（引数・戻り値）
+- 型アノテーションを必ず付ける（引数・戻り値）。`Optional[X]` ではなく `X | None` を使う
 - async 関数には `async def` を使う。DB アクセスはすべて await する
 - DB セッションは `async with AsyncSession(engine) as session:` パターンで使う（SQLModel の `AsyncSession` を利用）
 - `event_bus` は `asyncio.Queue` ベース。全処理がイベントループ内のため `call_soon_threadsafe` は不要
+- `except` 節で例外を再送出するときは `raise ... from err` または `raise ... from None` を使う
+
+## docstring・コメント規約
+
+- プロダクトコードの公開関数には Google スタイルの docstring を付ける
+- 非公開関数（`_` プレフィックス）や自明なヘルパーは省略可
+
+```python
+def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
+    """AI にテーブル設計（TSV）を生成または更新させる。
+
+    Args:
+        prompt: ユーザーからの依頼テキスト。
+        current_tsv: 既存のカラム定義 TSV。指定時は更新モードで動作する。
+
+    Returns:
+        生成されたカラム定義の TSV 文字列。
+
+    Raises:
+        ValueError: OPENAI_API_KEY が未設定の場合。
+    """
+```
+
+## テストコード規約
+
+- **unittest より pytest を優先**: `unittest.mock.patch` / `MagicMock` ではなく
+  `monkeypatch` / `pytest.fixture` を使う
+- pytest fixture が適したところでは積極的に活用する（テストデータ、モック注入など）
+- **ユニットテスト**: AAA（Arrange-Act-Assert）スタイルで空行ブロック分けする
+
+```python
+def test_write_and_read_tsv(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+
+    # Act
+    rows = table_service.read_tsv("users")
+
+    # Assert
+    assert rows[0]["column_name"] == "id"
+```
+
+- **統合テスト・E2E**: Gherkin（Given-When-Then）スタイルで空行ブロック分けする
+
+```python
+def test_create_table_via_ai(client: TestClient, mock_openai: None) -> None:
+    # Given: AI モックが TSV を返す状態でアプリが起動している
+
+    # When: テーブル作成 API にリクエストを送る
+    resp = client.post(
+        "/api/tables",
+        data={"name": "users", "prompt": "ユーザーテーブルを作って"},
+        follow_redirects=True,
+    )
+
+    # Then: 200 が返りテーブル名がレスポンスに含まれる
+    assert resp.status_code == 200
+    assert "users" in resp.text
+```
+
+## エラーハンドリング規約
+
+- ドメイン層・サービス層の失敗は、意味のあるエラー種別（例外クラスまたはエラーコード）で表現する
+- HTTP ハンドラは生の `error` 文字列に依存せず、例外の**型**からステータスコードとユーザー向けメッセージを決定する
+- 同じ種類の失敗は、ハンドラやレスポンス形式（HTML / JSON）にかかわらず同じメッセージを返す
+- `strings.Contains(err.Error(), "...")` 相当の文字列マッチによるエラー判定は禁止
+
+## 静的アセット分離ルール
+
+- `<script>` タグ内にコードを直接書かない。ロジックは `static/js/*.js` に切り出す
+- `<style>` タグ内にスタイルを直接書かない。スタイルは `static/css/*.css` に切り出す
+- テンプレートからは `<script src="/static/js/...">` や `<link rel="stylesheet" href="/static/css/...">` で参照する
+- **例外（インラインで書いてよいもの）**: hyperscript の `_="..."` 属性、htmx の `hx-*` 属性
+
+## UI インタラクション規約
+
+- クラス付け替え・表示/非表示・モーダル開閉・タブ切り替えなどの一般的な UI インタラクションは hyperscript 属性で記述する
+- ページごとの ad-hoc な JavaScript を増やさない
+- JavaScript を書くべきケース: 複数コンポーネント間で状態を共有する複雑な挙動、API 呼び出しなどロジックに集中する処理
 
 ## AI 連携規約
 
@@ -86,12 +170,30 @@ def test_events_route_is_registered():
     assert "/events" in paths
 ```
 
+## 開発フロー（テスト先行）
+
+- 新機能追加・仕様変更では、**先にテストを書き、そのテストを通す実装を行う**
+- テストがすべてグリーンになった時点でタスク完了とみなす
+- **不具合を確認したとき**: 先に落ちる回帰テストを追加してから修正する
+- リファクタリングでは先に既存挙動をテストで固定してからコードを変更する
+- テストの優先順位:
+  1. 代表的なユーザーフローは Playwright E2E
+  2. HTML 構造・API のステータスコードは FastAPI `TestClient` 統合テスト
+  3. ドメインロジック単体は pytest ユニットテスト
+
 ## テンプレートレスポンス
 
 ```python
 # 正しい（Starlette 1.x 以降）
 templates.TemplateResponse(request, "template.html", {"key": "value"})
 ```
+
+## 応答言語
+
+- **会話**: ユーザーとのやりとりは基本的に**日本語**で行う
+- **説明・コメント**: コード外の説明、コミットメッセージも日本語で書く
+- **コード**: 変数名・関数名・ファイル名はプロジェクトの既存規約に従う（英語のまま）
+- ユーザーが英語で質問した場合は、返答も英語で行う
 
 ## コミット規約
 

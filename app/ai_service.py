@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 
 from openai import OpenAI
 
@@ -18,14 +17,30 @@ column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription
 
 
 def get_client() -> OpenAI:
+    """OpenAI クライアントを生成する。
+
+    Returns:
+        設定済みの OpenAI クライアント。
+
+    Raises:
+        ValueError: OPENAI_API_KEY が未設定の場合。
+    """
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY が設定されていません")
     return OpenAI(api_key=api_key)
 
 
-def generate_table_design(prompt: str, current_tsv: Optional[str] = None) -> str:
-    """AI にテーブル設計（TSV）を生成または更新させる。"""
+def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
+    """AI にテーブル設計（TSV）を生成または更新させる。
+
+    Args:
+        prompt: ユーザーからの依頼テキスト。
+        current_tsv: 既存のカラム定義 TSV。指定時は更新モードで動作する。
+
+    Returns:
+        生成されたカラム定義の TSV 文字列。
+    """
     user_message = prompt
     if current_tsv:
         user_message = f"現在のテーブル定義:\n{current_tsv}\n\n依頼: {prompt}"
