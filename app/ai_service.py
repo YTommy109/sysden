@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 
 import yaml
@@ -8,6 +9,8 @@ _STUB_TSV = (
     "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
     "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
 )
+
+_SECTION_RE = re.compile(r"^\[([^\]]+)\]$")
 
 _PROMPTS_PATH = Path(__file__).parent.parent / "prompts" / "ai_prompts.yaml"
 
@@ -35,6 +38,41 @@ def get_client() -> OpenAI:
     if not api_key:
         raise ValueError("OPENAI_API_KEY が設定されていません")
     return OpenAI(api_key=api_key)
+
+
+def _parse_multi_table_response(content: str) -> list[tuple[str, str]]:
+    """``[table_name]`` セクション形式のレスポンスをパースする。
+
+    Args:
+        content: AI が返した ``[name]\\nTSV...`` 形式のテキスト。
+
+    Returns:
+        ``(テーブル名, TSV 文字列)`` のリスト。
+
+    Raises:
+        ValueError: セクションヘッダーが 1 つも見つからない場合。
+    """
+    tables: list[tuple[str, str]] = []
+    current_name: str | None = None
+    current_lines: list[str] = []
+
+    for line in content.splitlines():
+        m = _SECTION_RE.match(line.strip())
+        if m:
+            if current_name is not None:
+                tables.append((current_name, "\n".join(current_lines).strip() + "\n"))
+            current_name = m.group(1).strip()
+            current_lines = []
+        elif current_name is not None:
+            current_lines.append(line)
+
+    if current_name is not None:
+        tables.append((current_name, "\n".join(current_lines).strip() + "\n"))
+
+    if not tables:
+        raise ValueError("テーブル定義が見つかりません")
+
+    return tables
 
 
 def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
@@ -68,17 +106,17 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
     return response.choices[0].message.content or ""
 
 
-def create_table_design(prompt: str) -> tuple[str, str]:
+def create_table_design(prompt: str) -> list[tuple[str, str]]:
     """AI にテーブル名とカラム定義（TSV）を生成させる。
 
     Args:
         prompt: ユーザーからの依頼テキスト。
 
     Returns:
-        (テーブル名, TSV 文字列) のタプル。
+        ``(テーブル名, TSV 文字列)`` のリスト。1 件以上のテーブルを含む。
     """
     if os.environ.get("SYSDEN_TEST_MODE") == "1":
-        return ("stub_table", _STUB_TSV)
+        return [("stub_table", _STUB_TSV)]
 
     config = _load_prompts()["table_create"]
     client = get_client()
@@ -91,7 +129,4 @@ def create_table_design(prompt: str) -> tuple[str, str]:
         temperature=config["temperature"],
     )
     content = response.choices[0].message.content or ""
-    first_newline = content.index("\n")
-    name = content[:first_newline].strip()
-    tsv = content[first_newline + 1 :]
-    return (name, tsv)
+    return _parse_multi_table_response(content)

@@ -130,6 +130,71 @@ def test_delete_table(
     assert resp.json() == {"status": "deleted", "name": "users"}
 
 
+def test_create_multiple_tables_via_ai(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: AI モックが 2 テーブルの [name] 形式を返す
+    multi_response = (
+        "[users]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "\n"
+        "[orders]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    fake = make_fake_openai_client(tsv=multi_response)
+    monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+    # When: name なしでテーブル作成 API にリクエストを送る
+    resp = client.post(
+        "/api/tables",
+        data={"prompt": "ユーザーと注文テーブルを作って"},
+        follow_redirects=True,
+    )
+
+    # Then: トップページにリダイレクトされ両テーブルが存在する
+    assert resp.status_code == 200
+    from app import table_service
+
+    assert table_service.table_exists("users")
+    assert table_service.table_exists("orders")
+
+
+def test_create_multiple_tables_conflict(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    sample_tsv: str,
+) -> None:
+    # Given: "orders" が既に存在し、AI が users + orders を返す
+    from app import table_service
+
+    table_service.write_tsv("orders", sample_tsv)
+
+    multi_response = (
+        "[users]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "\n"
+        "[orders]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    fake = make_fake_openai_client(tsv=multi_response)
+    monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+    # When: name なしでテーブル作成 API にリクエストを送る
+    resp = client.post(
+        "/api/tables",
+        data={"prompt": "ユーザーと注文テーブルを作って"},
+    )
+
+    # Then: 409 Conflict が返り、users は作成されない
+    assert resp.status_code == 409
+    assert not table_service.table_exists("users")
+
+
 def test_delete_table_404(client: TestClient) -> None:
     # Given: テーブルが存在しない
 

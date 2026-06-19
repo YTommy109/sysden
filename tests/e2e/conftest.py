@@ -67,6 +67,8 @@ def clean_data(e2e_data_dir: Path) -> None:
     """各テスト前にデータディレクトリの TSV を削除する。"""
     for f in e2e_data_dir.glob("*.tsv"):
         f.unlink()
+    for f in e2e_data_dir.glob("*.mmd"):
+        f.unlink()
 
 
 @pytest.fixture()

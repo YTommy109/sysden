@@ -3,6 +3,7 @@ import csv
 from app.config import get_data_dir
 
 TSV_HEADERS = ["column_name", "type", "nullable", "pk", "unique", "default", "description"]
+_INDEX_STEM = "index"
 
 
 def list_tables() -> list[str]:
@@ -13,7 +14,7 @@ def list_tables() -> list[str]:
     """
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
-    return sorted(f.stem for f in d.glob("*.tsv"))
+    return sorted(f.stem for f in d.glob("*.tsv") if f.stem != _INDEX_STEM)
 
 
 def read_tsv_raw(name: str) -> str:
@@ -117,16 +118,97 @@ def table_exists(name: str) -> bool:
     return (get_data_dir() / f"{name}.tsv").exists()
 
 
-def tables_to_er_diagram() -> str:
-    """全テーブルの mermaid erDiagram テキストを生成する（項目なし）。
+def rebuild_index() -> None:
+    """テーブル一覧 (index.tsv) と ER 図 (index.mmd) を再生成する。
+
+    テーブル追加・削除の後に呼び出す。
+    """
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    names = list_tables()
+
+    lines = ["name"] + names
+    (d / f"{_INDEX_STEM}.tsv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    er = tables_to_er_diagram()
+    (d / f"{_INDEX_STEM}.mmd").write_text(er, encoding="utf-8")
+
+
+def read_index_tables() -> list[str]:
+    """index.tsv からテーブル名一覧を読み込む。
 
     Returns:
-        テーブルが 1 件以上あれば ``erDiagram\\n  table1\\n  ...`` 形式。
-        0 件なら空文字列。
+        テーブル名のリスト。ファイルが存在しなければ空リスト。
+    """
+    path = get_data_dir() / f"{_INDEX_STEM}.tsv"
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        return [row["name"] for row in reader]
+
+
+def read_er_diagram() -> str:
+    """index.mmd から ER 図テキストを読み込む。
+
+    Returns:
+        mermaid erDiagram テキスト。ファイルが存在しないか空なら空文字列。
+    """
+    path = get_data_dir() / f"{_INDEX_STEM}.mmd"
+    if not path.exists():
+        return ""
+    content = path.read_text(encoding="utf-8").strip()
+    return content
+
+
+def _resolve_fk_target(column_name: str, table_names: set[str]) -> str | None:
+    """``_id`` サフィックスのカラム名から参照先テーブルを推定する。
+
+    Args:
+        column_name: カラム名（例: ``user_id``）。
+        table_names: 存在するテーブル名のセット。
+
+    Returns:
+        一致したテーブル名。見つからなければ ``None``。
+    """
+    if not column_name.endswith("_id"):
+        return None
+    prefix = column_name[: -len("_id")]
+    for candidate in (prefix, f"{prefix}s"):
+        if candidate in table_names:
+            return candidate
+    return None
+
+
+def tables_to_er_diagram() -> str:
+    """全テーブルの mermaid erDiagram テキストを生成する。
+
+    ``_id`` サフィックスのカラムから外部キー関係を推定し、リレーション線を描く。
+
+    Returns:
+        テーブルが 1 件以上あれば erDiagram テキスト。0 件なら空文字列。
     """
     names = list_tables()
     if not names:
         return ""
+
+    name_set = set(names)
     lines = ["erDiagram"]
+    relations: list[str] = []
+
+    for name in names:
+        try:
+            rows = read_tsv(name)
+        except FileNotFoundError:
+            continue
+        for row in rows:
+            target = _resolve_fk_target(row.get("column_name", ""), name_set)
+            if target is None or target == name:
+                continue
+            nullable = row.get("nullable", "NO").upper() == "YES"
+            arrow = "|o--o{" if nullable else "||--o{"
+            relations.append(f'    {target} {arrow} {name} : ""')
+
     lines.extend(f"    {name}" for name in names)
+    lines.extend(relations)
     return "\n".join(lines)
