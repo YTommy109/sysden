@@ -7,15 +7,35 @@ description: Navigate and understand codebase structure using the knowledge grap
 
 Use the dagayn MCP tools to explore and understand the codebase.
 
+<!-- derived-from ../../docs/plans/ANALYSIS-TOOL-STRATEGY.md#exploration-analysis -->
+
 <!-- dagayn skill embedding context -->
 ## Installed Search Mode
 
-Installed in FTS-only mode (`--mode fts`).
+Installed in FTS-only mode (`--mode fts-only`).
 
 - Treat `semantic_search_nodes_tool` as keyword/FTS search, not vector semantic search.
+- `search_mode` should normally be `fts_only`; `keyword_fallback` means the FTS index is absent and should be refreshed before quality claims.
 - Prefer exact symbols, file names, graph relationships, and one targeted `rg` for literals.
 - Do not rebuild embeddings unless the user explicitly changes install mode.
 <!-- /dagayn skill embedding context -->
+
+## Decision Model
+
+- Unknown entity, fuzzy concept, or process-language query: use
+  `semantic_search_nodes_tool` first, then pick a concrete `qualified_name`.
+- Known entity plus a specific relationship: use `query_graph_tool` with the
+  narrowest pattern (`callers_of`, `callees_of`, `imports_of`, `tests_for`,
+  `docs_for`, `implementations_of`, `children_of`, or `file_summary`).
+- Changed code, review risk, or blast radius: use `review_tool` before raw
+  traversal.
+- Architecture health or structural risk: use
+  `architecture_analysis_tool(mode="overview")` before metric drill-downs.
+- Execution path: use `flow_tool(mode="list")`, then `flow_tool(mode="get")`
+  only after choosing a concrete flow.
+- Neighborhood exploration: use `traverse_graph_tool` only after choosing a
+  concrete start node and only when a specific relationship query would be too
+  narrow.
 
 ### Steps
 
@@ -59,6 +79,9 @@ Installed in FTS-only mode (`--mode fts`).
   graph.
 - For tiny literal lookups, one `rg` is fine after minimal context; switch back
   to graph tools once you have a file, function, or class name.
+- Do not use raw BFS/DFS as the first exploration move. Prefer search for
+  discovery and `query_graph_tool` for relationship verification; raw traversal
+  is a follow-up for a bounded neighborhood.
 - Treat graph output as evidence: cite counts, thresholds, reason codes, and
   truncation flags when making architectural claims.
 
