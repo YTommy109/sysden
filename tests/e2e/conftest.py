@@ -70,7 +70,7 @@ def clean_data(e2e_data_dir: Path) -> None:
 
 
 @pytest.fixture()
-def create_table(base_url: str) -> Callable[[str, str], None]:
+def create_table(base_url: str) -> Callable[..., None]:
     """API 経由でテーブルを作成するヘルパー。"""
 
     def _create(name: str, prompt: str = "テスト用テーブル") -> None:

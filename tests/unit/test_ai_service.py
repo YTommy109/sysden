@@ -43,3 +43,32 @@ def test_get_client_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
     # Act & Assert
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
         ai_service.get_client()
+
+
+def test_create_table_design_returns_name_and_tsv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    response_text = "users\ncolumn_name\ttype\n"
+    fake = make_fake_openai_client(tsv=response_text)
+    monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+    # Act
+    name, tsv = ai_service.create_table_design("ユーザーテーブルを作って")
+
+    # Assert
+    assert name == "users"
+    assert "column_name" in tsv
+
+
+def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
+
+    # Act
+    name, tsv = ai_service.create_table_design("何でも")
+
+    # Assert
+    assert isinstance(name, str)
+    assert len(name) > 0
+    assert "column_name" in tsv

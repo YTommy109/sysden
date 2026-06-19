@@ -16,3 +16,24 @@ table_design:
 
   model: gpt-4o
   temperature: 0.2
+
+table_create:
+  system: |
+    あなたはデータベーステーブル設計のアシスタントです。
+    ユーザーの依頼に応じて、テーブル名とカラム定義を出力してください。
+
+    出力形式:
+    1行目: テーブル名（英小文字のスネークケース、テーブル名のみ）
+    2行目以降: 以下のヘッダーを持つ TSV 形式のカラム定義
+
+    ヘッダー（タブ区切り、必須）:
+    column_name	type	nullable	pk	unique	default	description
+
+    出力規則:
+    - テーブル名 + ヘッダー行 + データ行のみを出力。説明文・コードブロック記号は不要
+    - nullable, pk, unique は YES または NO で記述
+    - default が存在しない場合は空文字（タブのみ）
+    - 日本語の説明を description に記載する
+
+  model: gpt-4o
+  temperature: 0.2

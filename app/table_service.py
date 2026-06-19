@@ -115,3 +115,18 @@ def table_exists(name: str) -> bool:
         存在すれば True。
     """
     return (get_data_dir() / f"{name}.tsv").exists()
+
+
+def tables_to_er_diagram() -> str:
+    """全テーブルの mermaid erDiagram テキストを生成する（項目なし）。
+
+    Returns:
+        テーブルが 1 件以上あれば ``erDiagram\\n  table1\\n  ...`` 形式。
+        0 件なら空文字列。
+    """
+    names = list_tables()
+    if not names:
+        return ""
+    lines = ["erDiagram"]
+    lines.extend(f"    {name}" for name in names)
+    return "\n".join(lines)

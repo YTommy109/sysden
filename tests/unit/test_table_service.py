@@ -114,3 +114,38 @@ def test_table_exists(sample_tsv: str) -> None:
 
     # Assert
     assert table_service.table_exists("foo")
+
+
+def test_tables_to_er_diagram_empty() -> None:
+    # Arrange — テーブルが存在しない
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert
+    assert result == ""
+
+
+def test_tables_to_er_diagram_single(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert
+    assert result.startswith("erDiagram")
+    assert "users" in result
+
+
+def test_tables_to_er_diagram_multiple(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_tsv("orders", sample_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert
+    assert "users" in result
+    assert "orders" in result
