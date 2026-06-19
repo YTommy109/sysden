@@ -86,6 +86,31 @@ def delete_table(name: str) -> None:
 
 _DISPLAY_HEADERS = ["カラム名", "型", "ユニーク", "説明"]
 
+_TYPE_MAP: dict[str, str] = {
+    "DATE": "日付",
+    "VARCHAR": "文字列",
+    "DECIMAL": "固定小数点数",
+    "INTEGER": "整数",
+    "INT": "整数",
+    "BIGINT": "整数",
+    "SMALLINT": "整数",
+    "TEXT": "テキスト",
+    "BOOLEAN": "真偽値",
+    "TIMESTAMPTZ": "タイムスタンプ",
+    "TIMESTAMP": "タイムスタンプ",
+}
+
+_TYPE_PARAM_RE = re.compile(r"^([A-Za-z]+)(\(.+\))$")
+
+
+def _translate_type(raw_type: str) -> str:
+    """SQL 型名を日本語表記に変換する。"""
+    m = _TYPE_PARAM_RE.match(raw_type)
+    if m:
+        base, params = m.group(1), m.group(2)
+        return _TYPE_MAP.get(base.upper(), base) + params
+    return _TYPE_MAP.get(raw_type.upper(), raw_type)
+
 
 def _build_description(row: dict[str, str]) -> str:
     """description を説明セルとして返す。"""
@@ -97,7 +122,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
 
     TSV の 7 列（column_name, type, nullable, pk, unique, default, description）を
     表示用の 4 列（カラム名, 型, ユニーク, 説明）にマッピングする。
-    必須（nullable=NO）は型に * プレフィックスで表現し、pk は太字、default は説明に統合する。
+    型名は日本語に変換し、必須は * プレフィックス、PK は太字、FK は薄色で表現する。
 
     Args:
         rows: カラム定義の辞書リスト。空の場合はプレースホルダを返す。
@@ -107,16 +132,29 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     """
     if not rows:
         return "_（カラム定義なし）_"
+
+    table_names = set(list_tables())
+
     sep = ["---"] * len(_DISPLAY_HEADERS)
     lines = [
         "| " + " | ".join(_DISPLAY_HEADERS) + " |",
         "| " + " | ".join(sep) + " |",
     ]
     for row in rows:
-        name = row.get("column_name", "")
-        if row.get("pk", "").upper() == "YES":
-            name = f"**{name}**"
-        col_type = row.get("type", "")
+        col_name = row.get("column_name", "")
+        description = row.get("description", "")
+
+        is_fk = _resolve_fk_target(col_name, table_names, description) is not None
+        is_pk = row.get("pk", "").upper() == "YES"
+
+        if is_pk:
+            name = f"**{col_name}**"
+        elif is_fk:
+            name = f'<span class="fk">{col_name}</span>'
+        else:
+            name = col_name
+
+        col_type = _translate_type(row.get("type", ""))
         if row.get("nullable", "").upper() == "NO":
             col_type = f'<span class="required">*</span> {col_type}'
         cells = [
