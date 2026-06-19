@@ -14,13 +14,19 @@ def create_table(
     name: Annotated[str | None, Form()] = None,
 ) -> RedirectResponse:
     if name is None:
-        name, tsv = ai_service.create_table_design(prompt)
+        tables = ai_service.create_table_design(prompt)
     else:
         tsv = ai_service.generate_table_design(prompt)
-    if table_service.table_exists(name):
-        raise HTTPException(status_code=409, detail=f"Table '{name}' already exists")
-    table_service.write_tsv(name, tsv)
-    return RedirectResponse(url=f"/tables/{name}", status_code=303)
+        tables = [(name, tsv)]
+    for tbl_name, _ in tables:
+        if table_service.table_exists(tbl_name):
+            raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
+    for tbl_name, tbl_tsv in tables:
+        table_service.write_tsv(tbl_name, tbl_tsv)
+    table_service.rebuild_index()
+    if len(tables) == 1:
+        return RedirectResponse(url=f"/tables/{tables[0][0]}", status_code=303)
+    return RedirectResponse(url="/", status_code=303)
 
 
 @router.post("/tables/{name}")
@@ -43,4 +49,5 @@ def delete_table(name: str) -> dict[str, str]:
         table_service.delete_table(name)
     except FileNotFoundError as err:
         raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
+    table_service.rebuild_index()
     return {"status": "deleted", "name": name}

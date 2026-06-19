@@ -3,6 +3,23 @@ import pytest
 from app import ai_service
 from tests.conftest import make_fake_openai_client
 
+MULTI_TABLE_RESPONSE = (
+    "[users]\n"
+    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "\n"
+    "[orders]\n"
+    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "user_id\tUUID\tNO\tNO\tNO\t\t注文者\n"
+)
+
+SINGLE_TABLE_RESPONSE = (
+    "[users]\n"
+    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+)
+
 
 @pytest.fixture()
 def mock_openai(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
@@ -45,20 +62,34 @@ def test_get_client_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
         ai_service.get_client()
 
 
-def test_create_table_design_returns_name_and_tsv(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_create_table_design_single_table(monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
-    response_text = "users\ncolumn_name\ttype\n"
-    fake = make_fake_openai_client(tsv=response_text)
+    fake = make_fake_openai_client(tsv=SINGLE_TABLE_RESPONSE)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
 
     # Act
-    name, tsv = ai_service.create_table_design("ユーザーテーブルを作って")
+    tables = ai_service.create_table_design("ユーザーテーブルを作って")
 
     # Assert
+    assert len(tables) == 1
+    name, tsv = tables[0]
     assert name == "users"
     assert "column_name" in tsv
+
+
+def test_create_table_design_multiple_tables(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    fake = make_fake_openai_client(tsv=MULTI_TABLE_RESPONSE)
+    monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+    # Act
+    tables = ai_service.create_table_design("ユーザーと注文テーブルを作って")
+
+    # Assert
+    assert len(tables) == 2
+    assert tables[0][0] == "users"
+    assert tables[1][0] == "orders"
+    assert "user_id" in tables[1][1]
 
 
 def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,9 +97,54 @@ def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
 
     # Act
-    name, tsv = ai_service.create_table_design("何でも")
+    tables = ai_service.create_table_design("何でも")
 
     # Assert
+    assert len(tables) == 1
+    name, tsv = tables[0]
     assert isinstance(name, str)
     assert len(name) > 0
     assert "column_name" in tsv
+
+
+class TestParseMultiTableResponse:
+    """_parse_multi_table_response のユニットテスト。"""
+
+    def test_single_table(self) -> None:
+        # Act
+        result = ai_service._parse_multi_table_response(SINGLE_TABLE_RESPONSE)
+
+        # Assert
+        assert len(result) == 1
+        assert result[0][0] == "users"
+        assert "id\tUUID" in result[0][1]
+
+    def test_multiple_tables(self) -> None:
+        # Act
+        result = ai_service._parse_multi_table_response(MULTI_TABLE_RESPONSE)
+
+        # Assert
+        assert len(result) == 2
+        assert result[0][0] == "users"
+        assert result[1][0] == "orders"
+
+    def test_strips_whitespace(self) -> None:
+        # Arrange
+        text = "\n\n[users]\ncolumn_name\ttype\nid\tUUID\n\n\n"
+
+        # Act
+        result = ai_service._parse_multi_table_response(text)
+
+        # Assert
+        assert len(result) == 1
+        assert result[0][0] == "users"
+
+    def test_empty_response_raises(self) -> None:
+        # Act & Assert
+        with pytest.raises(ValueError, match="テーブル定義"):
+            ai_service._parse_multi_table_response("")
+
+    def test_no_section_header_raises(self) -> None:
+        # Act & Assert
+        with pytest.raises(ValueError, match="テーブル定義"):
+            ai_service._parse_multi_table_response("column_name\ttype\nid\tUUID\n")
