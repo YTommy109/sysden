@@ -298,7 +298,7 @@ class TestRebuildButtons:
         page.goto(base_url)
 
         # Then: "テーブル一覧の再作成" ボタンが表示される
-        btn = page.locator('button:has-text("テーブル一覧の再作成")')
+        btn = page.locator('button[aria-label="テーブル一覧の再作成"]')
         expect(btn).to_be_visible()
 
     def test_rebuild_er_diagram_button_visible(self, page: Page, base_url: str) -> None:
@@ -306,7 +306,7 @@ class TestRebuildButtons:
         page.goto(base_url)
 
         # Then: "ER 図の再作成" ボタンが表示される
-        btn = page.locator('button:has-text("ER 図の再作成")')
+        btn = page.locator('button[aria-label="ER 図の再作成"]')
         expect(btn).to_be_visible()
 
     def test_rebuild_index_tables_restores_list(
@@ -322,7 +322,7 @@ class TestRebuildButtons:
         expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
 
         # When: "テーブル一覧の再作成" ボタンをクリックする
-        page.locator('button:has-text("テーブル一覧の再作成")').click()
+        page.locator('button[aria-label="テーブル一覧の再作成"]').click()
         page.wait_for_url("**/")
 
         # Then: テーブル行が表示される
@@ -341,7 +341,7 @@ class TestRebuildButtons:
         expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
         # When: "テーブル一覧の再作成" ボタンをクリックする
-        page.locator('button:has-text("テーブル一覧の再作成")').click()
+        page.locator('button[aria-label="テーブル一覧の再作成"]').click()
         page.wait_for_url("**/")
 
         # Then: ER 図も再作成されて表示される
@@ -360,7 +360,7 @@ class TestRebuildButtons:
         expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
         # When: "ER 図の再作成" ボタンをクリックする
-        page.locator('button:has-text("ER 図の再作成")').click()
+        page.locator('button[aria-label="ER 図の再作成"]').click()
         page.wait_for_url("**/")
 
         # Then: ER 図が表示される
