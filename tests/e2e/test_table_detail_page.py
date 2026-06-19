@@ -59,11 +59,11 @@ class TestTableDetailDisplay:
         expect(table_view).to_be_visible()
         expect(table_view.locator("table")).to_be_visible()
 
-        # Then: ヘッダーにカラム名が含まれる
-        expect(table_view.locator("th", has_text="column_name")).to_be_visible()
+        # Then: ヘッダーに日本語カラム名が含まれる
+        expect(table_view.locator("th", has_text="カラム名")).to_be_visible()
 
-        # Then: データ行に "id" が含まれる
-        expect(table_view.locator('td:text-is("id")')).to_be_visible()
+        # Then: データ行に "id" が含まれる（PK は太字で表示）
+        expect(table_view.locator("td >> strong", has_text="id")).to_be_visible()
 
     def test_shows_update_form(
         self, page: Page, base_url: str, create_table: Callable[..., None]

@@ -89,10 +89,238 @@ def test_tsv_to_markdown() -> None:
     # Act
     md = table_service.tsv_to_markdown(rows)
 
-    # Assert
-    assert "| id |" in md
-    assert "| UUID |" in md
+    # Assert — 日本語ヘッダー、PK 太字、必須は型に * プレフィックス
+    assert "| カラム名 |" in md
+    assert "| 型 |" in md
+    assert "| 必須 |" not in md
+    assert "| ユニーク |" in md
+    assert "| 説明 |" in md
+    assert "| **id** |" in md
+    assert '| <span class="required">*</span> UUID |' in md
     assert "---" in md
+
+
+def test_tsv_to_markdown_required_prefix_on_type() -> None:
+    # Arrange
+    rows = [
+        {
+            "column_name": "id",
+            "type": "UUID",
+            "nullable": "NO",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "memo",
+            "type": "TEXT",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+    ]
+
+    # Act
+    md = table_service.tsv_to_markdown(rows)
+
+    # Assert — nullable=NO → 型に * プレフィックス、nullable=YES → そのまま
+    lines = md.split("\n")
+    id_line = next(line for line in lines if "| id |" in line)
+    memo_line = next(line for line in lines if "| memo |" in line)
+    assert '| <span class="required">*</span> UUID |' in id_line
+    assert "| テキスト |" in memo_line
+
+
+def test_tsv_to_markdown_pk_makes_column_name_bold() -> None:
+    # Arrange
+    rows = [
+        {
+            "column_name": "id",
+            "type": "UUID",
+            "nullable": "NO",
+            "pk": "YES",
+            "unique": "YES",
+            "default": "",
+            "description": "主キー",
+        },
+        {
+            "column_name": "name",
+            "type": "VARCHAR(100)",
+            "nullable": "NO",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "ユーザー名",
+        },
+    ]
+
+    # Act
+    md = table_service.tsv_to_markdown(rows)
+
+    # Assert — PK カラムは太字、非 PK は素のまま
+    assert "| **id** |" in md
+    assert "| name |" in md
+
+
+def test_tsv_to_markdown_translates_types() -> None:
+    # Arrange
+    rows = [
+        {
+            "column_name": "a",
+            "type": "DATE",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "b",
+            "type": "VARCHAR(255)",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "c",
+            "type": "DECIMAL(10,2)",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "d",
+            "type": "INTEGER",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "e",
+            "type": "TEXT",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "f",
+            "type": "BOOLEAN",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "g",
+            "type": "TIMESTAMPTZ",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+        {
+            "column_name": "h",
+            "type": "UUID",
+            "nullable": "YES",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+    ]
+
+    # Act
+    md = table_service.tsv_to_markdown(rows)
+
+    # Assert — 型が日本語に変換される（パラメータは保持）
+    assert "| 日付 |" in md
+    assert "| 文字列(255) |" in md
+    assert "| 固定小数点数(10,2) |" in md
+    assert "| 整数 |" in md
+    assert "| テキスト |" in md
+    assert "| 真偽値 |" in md
+    assert "| タイムスタンプ |" in md
+    assert "| UUID |" in md
+
+
+def test_tsv_to_markdown_fk_column_has_fk_class(sample_tsv: str) -> None:
+    # Arrange — users テーブルを作成して user_id カラムを持つ行を表示
+    table_service.write_tsv("users", sample_tsv)
+    rows = [
+        {
+            "column_name": "user_id",
+            "type": "UUID",
+            "nullable": "NO",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+    ]
+
+    # Act
+    md = table_service.tsv_to_markdown(rows)
+
+    # Assert — FK カラム名が fk クラスの span で囲まれる
+    assert '<span class="fk">user_id</span>' in md
+
+
+def test_tsv_to_markdown_non_fk_column_no_fk_class() -> None:
+    # Arrange — FK でない通常カラム
+    rows = [
+        {
+            "column_name": "name",
+            "type": "VARCHAR(100)",
+            "nullable": "NO",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "",
+            "description": "",
+        },
+    ]
+
+    # Act
+    md = table_service.tsv_to_markdown(rows)
+
+    # Assert — fk クラスは付かない
+    assert "fk" not in md
+
+
+def test_tsv_to_markdown_description_without_default_prefix() -> None:
+    # Arrange
+    rows = [
+        {
+            "column_name": "end_date",
+            "type": "DATE",
+            "nullable": "NO",
+            "pk": "NO",
+            "unique": "NO",
+            "default": "9999-12-31",
+            "description": "発売終了日（未定の場合は 9999-12-31）",
+        }
+    ]
+
+    # Act
+    md = table_service.tsv_to_markdown(rows)
+
+    # Assert — description のみ表示、"デフォルト:" プレフィックスは付かない
+    lines = md.split("\n")
+    data_line = next(line for line in lines if "end_date" in line)
+    assert "発売終了日（未定の場合は 9999-12-31）" in data_line
+    assert "デフォルト:" not in data_line
 
 
 def test_tsv_to_markdown_empty() -> None:
