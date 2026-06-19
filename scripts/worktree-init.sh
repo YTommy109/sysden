@@ -13,12 +13,15 @@ fi
 
 ROOT="$(dirname "$COMMON_DIR")"
 
-for name in .envrc .claude; do
-  TARGET="$(pwd)/$name"
-  if [ ! -e "$TARGET" ]; then
-    ln -sfn "$ROOT/$name" "$TARGET"
-  fi
-done
+# .envrc はコピー（worktree ごとに独立した環境変数を持てるように）
+if [ ! -e "$(pwd)/.envrc" ] && [ -e "$ROOT/.envrc" ]; then
+  cp "$ROOT/.envrc" "$(pwd)/.envrc"
+fi
+
+# .claude はシンボリックリンク（設定を共有）
+if [ ! -e "$(pwd)/.claude" ]; then
+  ln -sfn "$ROOT/.claude" "$(pwd)/.claude"
+fi
 
 uv sync
 dagayn build --skip-flows
