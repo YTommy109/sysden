@@ -1,5 +1,16 @@
 {
   "enabledMcpjsonServers": ["dagayn"],
+  "permissions": {
+    "allow": [
+      "Bash(uv run task:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run ty:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ]
+  },
   "hooks": {
     "WorktreeCreate": [
       {

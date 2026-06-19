@@ -25,21 +25,18 @@ AI 生成は `asyncio.create_task()` で非同期実行し、完了を SSE で�
 
 - Python 3.14+ / FastAPI + uvicorn（ASGI サーバー）
 - SQLModel（SQLAlchemy 2.x async ラッパー）+ asyncpg（PostgreSQL アクセス）
-- Alembic（スキーママイグレーション）
 - Anthropic SDK（Claude Agent SDK クライアント）
 - markdown-it-py（markdown → HTML 変換）
 - sse-starlette（Server-Sent Events）
 - Jinja2（HTML テンプレート）
 - htmx + htmx-ext-sse + _hyperscript + mermaid.js（フロントエンド）
 - uv / taskipy（パッケージ管理・タスクランナー）
-- Docker Compose（app + postgres）
 
 ## コマンド
 
 ```bash
 uv run task dev       # FastAPI 開発サーバー起動（ポート 8000）
 uv run task test      # テスト + カバレッジ
-uv run task migrate   # Alembic マイグレーション適用
 uv run task lint      # Ruff チェック
 uv run task format    # Ruff フォーマット
 uv run task typecheck # ty 型チェック
@@ -246,5 +243,5 @@ Conventional Commits + 日本語:
 ```
 feat: ドキュメントビューア画面を追加する
 fix: AI ジョブが完了しても SSE 通知が届かない問題を修正する
-chore: alembic 初期マイグレーションを追加する
+chore: CI ワークフローを更新する
 ```
