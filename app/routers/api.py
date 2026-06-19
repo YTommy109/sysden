@@ -4,7 +4,6 @@ from fastapi import APIRouter, Form, HTTPException
 from fastapi.responses import RedirectResponse
 
 from app import ai_service, table_service
-from app.config import get_data_dir
 
 router = APIRouter(prefix="/api")
 
@@ -27,9 +26,9 @@ def update_table(
     prompt: Annotated[str, Form()],
 ) -> RedirectResponse:
     try:
-        current_tsv = (get_data_dir() / f"{name}.tsv").read_text(encoding="utf-8")
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+        current_tsv = table_service.read_tsv_raw(name)
+    except FileNotFoundError as err:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
     tsv = ai_service.generate_table_design(prompt, current_tsv)
     table_service.write_tsv(name, tsv)
     return RedirectResponse(url=f"/tables/{name}", status_code=303)
@@ -39,6 +38,6 @@ def update_table(
 def delete_table(name: str) -> dict[str, str]:
     try:
         table_service.delete_table(name)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+    except FileNotFoundError as err:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
     return {"status": "deleted", "name": name}

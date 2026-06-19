@@ -22,8 +22,8 @@ def index(request: Request) -> HTMLResponse:
 def table_detail(name: str, request: Request) -> HTMLResponse:
     try:
         rows = table_service.read_tsv(name)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+    except FileNotFoundError as err:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
     md_table = table_service.tsv_to_markdown(rows)
     rendered = _md.render(md_table)
     return templates.TemplateResponse(
