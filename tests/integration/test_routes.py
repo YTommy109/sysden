@@ -203,3 +203,32 @@ def test_delete_table_404(client: TestClient) -> None:
 
     # Then: 404 が返る
     assert resp.status_code == 404
+
+
+def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
+    # Given: テーブルが存在するが index.tsv がない
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+
+    # When: テーブル一覧再作成 API にリクエストを送る
+    resp = client.post("/api/rebuild-index-tables", follow_redirects=True)
+
+    # Then: 200 が返り index.tsv が生成される
+    assert resp.status_code == 200
+    assert table_service.read_index_tables() == ["users"]
+
+
+def test_rebuild_er_diagram(client: TestClient, sample_tsv: str) -> None:
+    # Given: テーブルが存在するが index.mmd がない
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+
+    # When: ER 図再作成 API にリクエストを送る
+    resp = client.post("/api/rebuild-er-diagram", follow_redirects=True)
+
+    # Then: 200 が返り ER 図が生成される
+    assert resp.status_code == 200
+    er = table_service.read_er_diagram()
+    assert "erDiagram" in er

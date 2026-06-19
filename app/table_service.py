@@ -118,20 +118,30 @@ def table_exists(name: str) -> bool:
     return (get_data_dir() / f"{name}.tsv").exists()
 
 
+def rebuild_index_tables() -> None:
+    """テーブル一覧 (index.tsv) を再生成する。"""
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    names = list_tables()
+    lines = ["name"] + names
+    (d / f"{_INDEX_STEM}.tsv").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def rebuild_er_diagram_file() -> None:
+    """ER 図 (index.mmd) を再生成する。"""
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    er = tables_to_er_diagram()
+    (d / f"{_INDEX_STEM}.mmd").write_text(er, encoding="utf-8")
+
+
 def rebuild_index() -> None:
     """テーブル一覧 (index.tsv) と ER 図 (index.mmd) を再生成する。
 
     テーブル追加・削除の後に呼び出す。
     """
-    d = get_data_dir()
-    d.mkdir(parents=True, exist_ok=True)
-    names = list_tables()
-
-    lines = ["name"] + names
-    (d / f"{_INDEX_STEM}.tsv").write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    er = tables_to_er_diagram()
-    (d / f"{_INDEX_STEM}.mmd").write_text(er, encoding="utf-8")
+    rebuild_index_tables()
+    rebuild_er_diagram_file()
 
 
 def read_index_tables() -> list[str]:

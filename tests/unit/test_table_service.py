@@ -342,3 +342,66 @@ def test_read_er_diagram_no_file() -> None:
 
     # Assert — ファイルがなければ空文字列
     assert result == ""
+
+
+def test_rebuild_index_tables_creates_tsv(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_tsv("orders", sample_tsv)
+
+    # Act
+    table_service.rebuild_index_tables()
+
+    # Assert — index.tsv が生成され、index.mmd は生成されない
+    from app.config import get_data_dir
+
+    d = get_data_dir()
+    assert (d / "index.tsv").exists()
+    assert not (d / "index.mmd").exists()
+    assert table_service.read_index_tables() == ["orders", "users"]
+
+
+def test_rebuild_index_tables_empty() -> None:
+    # Arrange — テーブルが存在しない
+
+    # Act
+    table_service.rebuild_index_tables()
+
+    # Assert — 空でもファイルは生成される（ヘッダのみ）
+    from app.config import get_data_dir
+
+    d = get_data_dir()
+    assert (d / "index.tsv").exists()
+    assert table_service.read_index_tables() == []
+
+
+def test_rebuild_er_diagram_file_creates_mmd(sample_tsv: str) -> None:
+    # Arrange
+    table_service.write_tsv("users", sample_tsv)
+
+    # Act
+    table_service.rebuild_er_diagram_file()
+
+    # Assert — index.mmd が生成され、index.tsv は生成されない
+    from app.config import get_data_dir
+
+    d = get_data_dir()
+    assert (d / "index.mmd").exists()
+    assert not (d / "index.tsv").exists()
+    result = table_service.read_er_diagram()
+    assert "erDiagram" in result
+    assert "users" in result
+
+
+def test_rebuild_er_diagram_file_empty() -> None:
+    # Arrange — テーブルが存在しない
+
+    # Act
+    table_service.rebuild_er_diagram_file()
+
+    # Assert — テーブルなしでも空文字列が書き込まれる
+    from app.config import get_data_dir
+
+    d = get_data_dir()
+    assert (d / "index.mmd").exists()
+    assert table_service.read_er_diagram() == ""
