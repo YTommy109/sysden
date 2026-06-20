@@ -18,7 +18,7 @@ class TestTableDetailDisplay:
         page.goto(f"{base_url}/tables/users")
 
         # Then: h1 にテーブル名が表示される
-        expect(page.locator("h1")).to_have_text("users")
+        expect(page.locator("h1").first).to_have_text("users")
 
     def test_shows_page_title(
         self, page: Page, base_url: str, create_table: Callable[..., None]
@@ -109,6 +109,21 @@ class TestTableDetailDisplay:
         # Then: ナビバーの sysden リンクが / を指す
         expect(page.locator('nav a[href="/"]')).to_be_visible()
 
+    def test_shows_markdown_description(
+        self, page: Page, base_url: str, create_table_auto: Callable[..., None]
+    ) -> None:
+        # Given: テーブルがテストモードで作成される（AI が名前 + TSV + markdown を生成）
+        create_table_auto()
+
+        # When: 詳細ページにアクセスする
+        page.goto(f"{base_url}/tables/stub_table")
+
+        # Then: markdown の内容がレンダリングされている
+        expect(page.locator("#table-view")).to_contain_text("テスト用テーブル")
+
+        # Then: 埋め込み TSV テーブルも表示される
+        expect(page.locator("#table-view table")).to_be_visible()
+
 
 class TestTableDetailUpdate:
     """テーブル更新フォームの操作。"""
@@ -126,7 +141,7 @@ class TestTableDetailUpdate:
 
         # Then: 同じ詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/users")
-        expect(page.locator("h1")).to_have_text("users")
+        expect(page.locator("h1").first).to_have_text("users")
 
         # Then: テーブルが表示される
         expect(page.locator("#table-view table")).to_be_visible()
