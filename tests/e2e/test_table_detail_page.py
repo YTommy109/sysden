@@ -18,7 +18,7 @@ class TestTableDetailDisplay:
         page.goto(f"{base_url}/tables/users")
 
         # Then: h1 にテーブル名が表示される
-        expect(page.locator("h1").first).to_have_text("users")
+        expect(page.locator("h1")).to_have_text("users")
 
     def test_shows_page_title(
         self, page: Page, base_url: str, create_table: Callable[..., None]
@@ -141,7 +141,7 @@ class TestTableDetailUpdate:
 
         # Then: 同じ詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/users")
-        expect(page.locator("h1").first).to_have_text("users")
+        expect(page.locator("h1")).to_have_text("users")
 
         # Then: テーブルが表示される
         expect(page.locator("#table-view table")).to_be_visible()

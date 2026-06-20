@@ -20,7 +20,7 @@ class TestEndToEndFlow:
 
         # Then: 詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/*")
-        table_name = page.locator("h1").first.inner_text()
+        table_name = page.locator("h1").inner_text()
 
         # When: 一覧に戻る
         page.click('a[href="/"]:has-text("一覧に戻る")')
@@ -58,7 +58,7 @@ class TestEndToEndFlow:
 
         # Then: 同じ詳細ページに留まり、テーブルが表示される
         page.wait_for_url(detail_url)
-        expect(page.locator("h1").first).to_be_visible()
+        expect(page.locator("h1")).to_be_visible()
         expect(page.locator("#table-view table")).to_be_visible()
 
     def test_index_link_to_detail(
@@ -73,5 +73,5 @@ class TestEndToEndFlow:
 
         # Then: 詳細ページに遷移する
         page.wait_for_url("**/tables/users")
-        expect(page.locator("h1").first).to_have_text("users")
+        expect(page.locator("h1")).to_have_text("users")
         expect(page.locator("#table-view table")).to_be_visible()

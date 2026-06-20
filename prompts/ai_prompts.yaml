@@ -37,7 +37,7 @@ table_create:
     id	UUID	NO	YES	YES
 
     [users.md]
-    # users テーブル
+    ## users テーブル
 
     ユーザー情報を管理するテーブル。
 
@@ -51,7 +51,7 @@ table_create:
     user_id	UUID	NO	NO	NO		注文者
 
     [orders.md]
-    # orders テーブル
+    ## orders テーブル
 
     注文情報を管理するテーブル。ユーザーと関連する。
 

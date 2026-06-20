@@ -234,7 +234,7 @@ class TestCreateTableDialog:
 
         # Then: テーブル詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/*")
-        expect(page.locator("h1").first).to_be_visible()
+        expect(page.locator("h1")).to_be_visible()
 
     def test_prompt_required_validation(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いた状態
@@ -259,7 +259,7 @@ class TestCreateTableDialog:
 
         # Then: テーブル詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/*")
-        expect(page.locator("h1").first).to_be_visible()
+        expect(page.locator("h1")).to_be_visible()
 
     def test_submit_via_ctrl_enter(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いて依頼文を入力した状態
@@ -273,7 +273,7 @@ class TestCreateTableDialog:
 
         # Then: テーブル詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/*")
-        expect(page.locator("h1").first).to_be_visible()
+        expect(page.locator("h1")).to_be_visible()
 
     def test_created_table_appears_on_index(self, page: Page, base_url: str) -> None:
         # Given: ダイアログからテーブルを作成する

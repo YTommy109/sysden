@@ -115,7 +115,7 @@ def read_markdown(name: str) -> str | None:
     return path.read_text(encoding="utf-8").strip()
 
 
-_EMBED_RE = re.compile(r"!\[\[(.+?\.tsv)\]\]")
+_EMBED_RE = re.compile(r"!\[\[([A-Za-z0-9_]+\.tsv)\]\]")
 
 
 def render_markdown_with_embeds(content: str) -> str:

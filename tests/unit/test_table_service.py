@@ -762,6 +762,17 @@ def test_render_markdown_with_embeds_missing_tsv() -> None:
     assert "missing.tsv" in result
 
 
+def test_render_markdown_with_embeds_ignores_path_traversal() -> None:
+    # Arrange — パストラバーサルを含む埋め込みリンク
+    content = "# test\n\n![[../../etc/passwd.tsv]]"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — パストラバーサルは展開されない（そのまま残る）
+    assert "![[../../etc/passwd.tsv]]" in result
+
+
 def test_delete_table_also_deletes_markdown(sample_tsv: str) -> None:
     # Arrange — TSV と markdown の両方を作成
     table_service.write_tsv("orders", sample_tsv)
