@@ -16,7 +16,7 @@ def client() -> TestClient:
 @pytest.fixture()
 def mock_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     """OpenAI クライアントをスタブに差し替え、固定 TSV を返す。"""
-    monkeypatch.setattr(ai_service, "get_client", lambda: make_fake_openai_client())
+    monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
 
 
 def test_index_returns_html(client: TestClient) -> None:
@@ -56,6 +56,51 @@ def test_create_table_via_ai(
     # Then: 200 が返りテーブル名がレスポンスに含まれる
     assert resp.status_code == 200
     assert "users" in resp.text
+
+    # Then: markdown ファイルも作成される
+    from app import table_service
+
+    md = table_service.read_markdown("users")
+    assert md is not None
+
+
+def test_table_detail_renders_markdown(
+    client: TestClient,
+    sample_tsv: str,
+) -> None:
+    # Given: TSV と markdown の両方が存在するテーブル
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown(
+        "users",
+        "# users テーブル\n\nユーザー管理。\n\n## テーブル設計\n\n![[users.tsv]]",
+    )
+
+    # When: 詳細ページにアクセスする
+    resp = client.get("/tables/users")
+
+    # Then: markdown の内容と TSV テーブルの両方がレンダリングされる
+    assert resp.status_code == 200
+    assert "ユーザー管理" in resp.text
+    assert "カラム名" in resp.text
+
+
+def test_table_detail_without_markdown(
+    client: TestClient,
+    sample_tsv: str,
+) -> None:
+    # Given: TSV のみ存在するテーブル（markdown なし）
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+
+    # When: 詳細ページにアクセスする
+    resp = client.get("/tables/users")
+
+    # Then: TSV テーブルのみ表示される（後方互換）
+    assert resp.status_code == 200
+    assert "カラム名" in resp.text
 
 
 def test_create_table_conflict(
@@ -140,9 +185,15 @@ def test_create_multiple_tables_via_ai(
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
         "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
         "\n"
+        "[users.md]\n"
+        "# users\n\n![[users.tsv]]\n"
+        "\n"
         "[orders]\n"
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
         "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "\n"
+        "[orders.md]\n"
+        "# orders\n\n![[orders.tsv]]\n"
     )
     fake = make_fake_openai_client(tsv=multi_response)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
@@ -160,6 +211,8 @@ def test_create_multiple_tables_via_ai(
 
     assert table_service.table_exists("users")
     assert table_service.table_exists("orders")
+    assert table_service.read_markdown("users") is not None
+    assert table_service.read_markdown("orders") is not None
 
 
 def test_create_multiple_tables_conflict(
@@ -177,9 +230,15 @@ def test_create_multiple_tables_conflict(
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
         "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
         "\n"
+        "[users.md]\n"
+        "# users\n\n![[users.tsv]]\n"
+        "\n"
         "[orders]\n"
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
         "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "\n"
+        "[orders.md]\n"
+        "# orders\n\n![[orders.tsv]]\n"
     )
     fake = make_fake_openai_client(tsv=multi_response)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)

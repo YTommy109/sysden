@@ -17,12 +17,15 @@ def create_table(
         tables = ai_service.create_table_design(prompt)
     else:
         tsv = ai_service.generate_table_design(prompt)
-        tables = [(name, tsv, "")]
-    for tbl_name, _, _md in tables:
+        default_md = f"# {name} テーブル\n\n## テーブル設計\n\n![[{name}.tsv]]\n"
+        tables = [(name, tsv, default_md)]
+    for tbl_name, _, _ in tables:
         if table_service.table_exists(tbl_name):
             raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
-    for tbl_name, tbl_tsv, _md in tables:
+    for tbl_name, tbl_tsv, tbl_md in tables:
         table_service.write_tsv(tbl_name, tbl_tsv)
+        if tbl_md:
+            table_service.write_markdown(tbl_name, tbl_md)
     table_service.rebuild_index()
     if len(tables) == 1:
         return RedirectResponse(url=f"/tables/{tables[0][0]}", status_code=303)
