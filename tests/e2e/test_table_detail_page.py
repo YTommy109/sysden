@@ -32,7 +32,7 @@ class TestTableDetailDisplay:
         # Then: ページタイトルが正しい
         expect(page).to_have_title("users — sysden")
 
-    def test_shows_back_link(
+    def test_shows_back_icon(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -41,8 +41,8 @@ class TestTableDetailDisplay:
         # When: 詳細ページにアクセスする
         page.goto(f"{base_url}/tables/users")
 
-        # Then: 一覧に戻るリンクが / を指す
-        back_link = page.locator('a[href="/"]', has_text="一覧に戻る")
+        # Then: 一覧に戻るアイコンリンクが / を指す
+        back_link = page.locator('a[href="/"][aria-label="一覧に戻る"]')
         expect(back_link).to_be_visible()
 
     def test_shows_rendered_table(
@@ -150,15 +150,15 @@ class TestTableDetailUpdate:
 class TestTableDetailNavigation:
     """テーブル詳細ページからのナビゲーション。"""
 
-    def test_back_link_goes_to_index(
+    def test_back_icon_goes_to_index(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
         create_table("users")
         page.goto(f"{base_url}/tables/users")
 
-        # When: "← 一覧に戻る" をクリックする
-        page.click('a[href="/"]:has-text("一覧に戻る")')
+        # When: 戻るアイコンをクリックする
+        page.click('a[href="/"][aria-label="一覧に戻る"]')
 
         # Then: トップページに遷移する
         page.wait_for_url(f"{base_url}/")

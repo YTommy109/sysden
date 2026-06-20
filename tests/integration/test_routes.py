@@ -74,7 +74,7 @@ def test_table_detail_renders_markdown(
     table_service.write_tsv("users", sample_tsv)
     table_service.write_markdown(
         "users",
-        "## ユーザー\n\nユーザー管理。\n\n## テーブル設計\n\n![[users.tsv]]",
+        "# ユーザー\n\n## 概要\n\nユーザー管理。\n\n## テーブル設計\n\n![[users.tsv]]",
     )
 
     # When: 詳細ページにアクセスする
@@ -96,7 +96,7 @@ def test_table_detail_shows_display_name(
     table_service.write_tsv("products", sample_tsv)
     table_service.write_markdown(
         "products",
-        "## プロダクト\n\n商品情報。\n\n## テーブル設計\n\n![[products.tsv]]",
+        "# プロダクト\n\n## 概要\n\n商品情報。\n\n## テーブル設計\n\n![[products.tsv]]",
     )
 
     # When: 詳細ページにアクセスする
@@ -104,7 +104,7 @@ def test_table_detail_shows_display_name(
 
     # Then: h1 と title に日本語表示名が使われる
     assert resp.status_code == 200
-    assert "<h1>プロダクト</h1>" in resp.text
+    assert ">プロダクト</h1>" in resp.text
     assert "プロダクト — sysden" in resp.text
 
 

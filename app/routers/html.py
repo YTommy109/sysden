@@ -32,7 +32,8 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
 
     md_content = table_service.read_markdown(name)
     if md_content is not None:
-        expanded = table_service.render_markdown_with_embeds(md_content)
+        body = table_service.strip_title_heading(md_content)
+        expanded = table_service.render_markdown_with_embeds(body)
         rendered = _md.render(expanded)
     else:
         md_table = table_service.tsv_to_markdown(rows)

@@ -115,7 +115,8 @@ def read_markdown(name: str) -> str | None:
     return path.read_text(encoding="utf-8").strip()
 
 
-_HEADING_RE = re.compile(r"^##\s+(.+?)(?:\s+テーブル)?\s*$", re.MULTILINE)
+_HEADING_RE = re.compile(r"^# (.+)$", re.MULTILINE)
+_TITLE_LINE_RE = re.compile(r"^# [^\n]+\n*")
 
 
 def read_table_display_name(name: str) -> str:
@@ -125,7 +126,7 @@ def read_table_display_name(name: str) -> str:
         name: テーブルのファイル名（拡張子なし）。
 
     Returns:
-        markdown の最初の ## 見出しから取得した表示名。
+        markdown の最初の # 見出しから取得した表示名。
         markdown がない場合や見出しがない場合はファイル名をそのまま返す。
     """
     md = read_markdown(name)
@@ -135,6 +136,20 @@ def read_table_display_name(name: str) -> str:
     if m:
         return m.group(1).strip()
     return name
+
+
+def strip_title_heading(content: str) -> str:
+    """markdown から最初の # 見出し行を除去する。
+
+    テンプレートの h1 と重複するため、レンダリング前に呼び出す。
+
+    Args:
+        content: markdown 文字列。
+
+    Returns:
+        # 見出しが除去された markdown 文字列。
+    """
+    return _TITLE_LINE_RE.sub("", content, count=1)
 
 
 _EMBED_RE = re.compile(r"!\[\[([A-Za-z0-9_]+\.tsv)\]\]")

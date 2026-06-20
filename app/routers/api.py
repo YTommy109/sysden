@@ -17,7 +17,7 @@ def create_table(
         tables = ai_service.create_table_design(prompt)
     else:
         tsv = ai_service.generate_table_design(prompt)
-        default_md = f"## {name} テーブル\n\n## テーブル設計\n\n![[{name}.tsv]]\n"
+        default_md = f"# {name}\n\n## 概要\n\n## テーブル設計\n\n![[{name}.tsv]]\n"
         tables = [(name, tsv, default_md)]
     for tbl_name, _, _ in tables:
         if table_service.table_exists(tbl_name):

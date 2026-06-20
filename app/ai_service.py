@@ -10,7 +10,7 @@ _STUB_TSV = (
     "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
 )
 
-_STUB_MD = "## スタブ\n\nテスト用テーブル。\n\n## テーブル設計\n\n![[stub_table.tsv]]\n"
+_STUB_MD = "# スタブ\n\n## 概要\n\nテスト用テーブル。\n\n## テーブル設計\n\n![[stub_table.tsv]]\n"
 
 
 _SECTION_RE = re.compile(r"^\[([^\]]+)\]$")

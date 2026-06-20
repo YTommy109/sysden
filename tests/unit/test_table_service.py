@@ -497,7 +497,7 @@ def test_tables_to_er_diagram_description_via_display_name() -> None:
         "種類識別子\tUUID\tNO\tNO\tNO\t\t商品種類テーブルの識別子を参照\n"
     )
     table_service.write_tsv("product_types", product_types_tsv)
-    table_service.write_markdown("product_types", "## 商品種類\n\n![[product_types.tsv]]")
+    table_service.write_markdown("product_types", "# 商品種類\n\n![[product_types.tsv]]")
     table_service.write_tsv("products", products_tsv)
 
     # Act
@@ -815,25 +815,16 @@ def test_delete_table_also_deletes_markdown(sample_tsv: str) -> None:
 
 
 def test_read_table_display_name_from_markdown() -> None:
-    # Arrange — 日本語見出しを持つ markdown
-    table_service.write_markdown("products", "## プロダクト\n\n説明。\n\n![[products.tsv]]")
+    # Arrange — h1 日本語見出しを持つ markdown
+    table_service.write_markdown(
+        "products", "# プロダクト\n\n## 概要\n\n説明。\n\n![[products.tsv]]"
+    )
 
     # Act
     result = table_service.read_table_display_name("products")
 
     # Assert
     assert result == "プロダクト"
-
-
-def test_read_table_display_name_strips_table_suffix() -> None:
-    # Arrange — 「テーブル」サフィックス付きの見出し
-    table_service.write_markdown("users", "## ユーザー テーブル\n\n![[users.tsv]]")
-
-    # Act
-    result = table_service.read_table_display_name("users")
-
-    # Assert — 「テーブル」が除去される
-    assert result == "ユーザー"
 
 
 def test_read_table_display_name_no_markdown() -> None:
@@ -847,8 +838,8 @@ def test_read_table_display_name_no_markdown() -> None:
 
 
 def test_read_table_display_name_no_heading() -> None:
-    # Arrange — 見出しがない markdown
-    table_service.write_markdown("notes", "本文のみ。")
+    # Arrange — h1 見出しがない markdown
+    table_service.write_markdown("notes", "## 概要\n\n本文のみ。")
 
     # Act
     result = table_service.read_table_display_name("notes")
@@ -857,10 +848,33 @@ def test_read_table_display_name_no_heading() -> None:
     assert result == "notes"
 
 
+def test_strip_title_heading() -> None:
+    # Arrange
+    content = "# プロダクト\n\n## 概要\n\n説明文。"
+
+    # Act
+    result = table_service.strip_title_heading(content)
+
+    # Assert — h1 が除去され、概要セクションから始まる
+    assert "# プロダクト" not in result
+    assert result.startswith("## 概要")
+
+
+def test_strip_title_heading_no_h1() -> None:
+    # Arrange — h1 がない場合はそのまま返る
+    content = "## 概要\n\n説明文。"
+
+    # Act
+    result = table_service.strip_title_heading(content)
+
+    # Assert
+    assert result == content
+
+
 def test_rebuild_index_tables_includes_display_name(sample_tsv: str) -> None:
     # Arrange — markdown 付きテーブルを作成
     table_service.write_tsv("products", sample_tsv)
-    table_service.write_markdown("products", "## プロダクト\n\n![[products.tsv]]")
+    table_service.write_markdown("products", "# プロダクト\n\n## 概要\n\n![[products.tsv]]")
 
     # Act
     table_service.rebuild_index_tables()
