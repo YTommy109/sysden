@@ -701,3 +701,75 @@ def test_rebuild_er_diagram_file_empty() -> None:
     d = get_data_dir()
     assert (d / "index.mmd").exists()
     assert table_service.read_er_diagram() == ""
+
+
+def test_write_and_read_markdown() -> None:
+    # Arrange
+    content = "# users\n\nユーザー管理テーブル。\n\n![[users.tsv]]"
+
+    # Act
+    table_service.write_markdown("users", content)
+    result = table_service.read_markdown("users")
+
+    # Assert
+    assert result == content
+
+
+def test_read_markdown_not_found() -> None:
+    # Arrange — markdown が存在しない
+
+    # Act
+    result = table_service.read_markdown("nonexistent")
+
+    # Assert
+    assert result is None
+
+
+def test_render_markdown_with_embeds(sample_tsv: str) -> None:
+    # Arrange — TSV を書き込み、埋め込みリンクを含む markdown を用意
+    table_service.write_tsv("users", sample_tsv)
+    content = "# users\n\n説明文。\n\n![[users.tsv]]"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — ![[users.tsv]] が markdown テーブルに展開される
+    assert "![[users.tsv]]" not in result
+    assert "| カラム名 |" in result
+    assert "| **id** |" in result
+
+
+def test_render_markdown_with_embeds_no_embed() -> None:
+    # Arrange — 埋め込みリンクがない markdown
+    content = "# users\n\n説明文のみ。"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — そのまま返る
+    assert result == content
+
+
+def test_render_markdown_with_embeds_missing_tsv() -> None:
+    # Arrange — 参照先の TSV が存在しない
+    content = "# missing\n\n![[missing.tsv]]"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — 埋め込みはプレースホルダになる
+    assert "![[missing.tsv]]" not in result
+    assert "missing.tsv" in result
+
+
+def test_delete_table_also_deletes_markdown(sample_tsv: str) -> None:
+    # Arrange — TSV と markdown の両方を作成
+    table_service.write_tsv("orders", sample_tsv)
+    table_service.write_markdown("orders", "# orders\n\n![[orders.tsv]]")
+
+    # Act
+    table_service.delete_table("orders")
+
+    # Assert — TSV も markdown も削除される
+    assert not table_service.table_exists("orders")
+    assert table_service.read_markdown("orders") is None

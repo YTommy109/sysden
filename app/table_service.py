@@ -70,7 +70,7 @@ def write_tsv(name: str, tsv_content: str) -> None:
 
 
 def delete_table(name: str) -> None:
-    """テーブルの TSV ファイルを削除する。
+    """テーブルの TSV ファイルと markdown ファイルを削除する。
 
     Args:
         name: テーブル名。
@@ -82,6 +82,62 @@ def delete_table(name: str) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Table '{name}' not found")
     path.unlink()
+    md_path = get_data_dir() / f"{name}.md"
+    if md_path.exists():
+        md_path.unlink()
+
+
+def write_markdown(name: str, content: str) -> None:
+    """テーブル説明の markdown をファイルに書き込む。
+
+    Args:
+        name: テーブル名。
+        content: markdown 文字列。
+    """
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{name}.md"
+    path.write_text(content.strip() + "\n", encoding="utf-8")
+
+
+def read_markdown(name: str) -> str | None:
+    """テーブル説明の markdown を読み込む。
+
+    Args:
+        name: テーブル名。
+
+    Returns:
+        markdown 文字列。ファイルが存在しなければ None。
+    """
+    path = get_data_dir() / f"{name}.md"
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8").strip()
+
+
+_EMBED_RE = re.compile(r"!\[\[(.+?\.tsv)\]\]")
+
+
+def render_markdown_with_embeds(content: str) -> str:
+    """markdown 内の ![[*.tsv]] を TSV テーブルの markdown 表現に展開する。
+
+    Args:
+        content: 埋め込みリンクを含む markdown 文字列。
+
+    Returns:
+        埋め込みが展開された markdown 文字列。
+    """
+
+    def _replace(m: re.Match[str]) -> str:
+        filename = m.group(1)
+        name = filename.removesuffix(".tsv")
+        try:
+            rows = read_tsv(name)
+        except FileNotFoundError:
+            return f"_（{filename} が見つかりません）_"
+        return tsv_to_markdown(rows)
+
+    return _EMBED_RE.sub(_replace, content)
 
 
 _DISPLAY_HEADERS = ["カラム名", "型", "ユニーク", "説明"]
