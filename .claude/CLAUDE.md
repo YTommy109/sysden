@@ -133,6 +133,7 @@ def test_create_table_via_ai(client: TestClient, mock_openai: None) -> None:
 
 - `<script>` タグ内にコードを直接書かない。ロジックは `static/js/*.js` に切り出す
 - `<style>` タグ内にスタイルを直接書かない。スタイルは `static/css/*.css` に切り出す
+- `<svg>` タグをテンプレートに直接書かない。アイコンは `static/icons/*.svg` に切り出す
 - テンプレートからは `<script src="/static/js/...">` や `<link rel="stylesheet" href="/static/css/...">` で参照する
 - **例外（インラインで書いてよいもの）**: hyperscript の `_="..."` 属性、htmx の `hx-*` 属性
 
