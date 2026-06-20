@@ -212,6 +212,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
         return "_（カラム定義なし）_"
 
     table_names = set(list_tables())
+    dn_map = _build_display_name_map(table_names)
 
     sep = ["---"] * len(_DISPLAY_HEADERS)
     lines = [
@@ -222,7 +223,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
         col_name = row.get("column_name", "")
         description = row.get("description", "")
 
-        is_fk = _resolve_fk_target(col_name, table_names, description) is not None
+        is_fk = _resolve_fk_target(col_name, table_names, description, dn_map) is not None
         is_pk = row.get("pk", "").upper() == "YES"
 
         if is_pk:
@@ -316,25 +317,37 @@ def read_er_diagram() -> str:
     return content
 
 
+def _build_display_name_map(table_names: set[str]) -> dict[str, str]:
+    """表示名からファイル名への逆引きマップを構築する。"""
+    mapping: dict[str, str] = {}
+    for name in table_names:
+        display = read_table_display_name(name)
+        if display != name:
+            mapping[display] = name
+    return mapping
+
+
 def _resolve_fk_target(
     column_name: str,
     table_names: set[str],
     description: str = "",
+    display_name_map: dict[str, str] | None = None,
 ) -> str | None:
     """カラム名または description から参照先テーブルを推定する。
 
     以下の順で判定し、最初にヒットしたテーブル名を返す:
 
     1. ``_id`` サフィックス（例: ``user_id`` → ``user`` / ``users``）
-    2. description 中の「〇〇テーブル」表記（例: 「商品種類テーブルの識別子」→ ``商品種類``）
+    2. description 中の「〇〇テーブル」表記（例: 「商品種類テーブルの識別子」→ ``product_types``）
 
     Args:
         column_name: カラム名（例: ``user_id``、``種類識別子``）。
-        table_names: 存在するテーブル名のセット。
+        table_names: 存在するテーブル名（ファイル名）のセット。
         description: カラムの説明文。
+        display_name_map: 表示名→ファイル名の逆引きマップ。
 
     Returns:
-        一致したテーブル名。見つからなければ ``None``。
+        一致したテーブル名（ファイル名）。見つからなければ ``None``。
     """
     if column_name.endswith("_id"):
         prefix = column_name[: -len("_id")]
@@ -347,6 +360,8 @@ def _resolve_fk_target(
         ref = match.group(1)
         if ref in table_names:
             return ref
+        if display_name_map and ref in display_name_map:
+            return display_name_map[ref]
 
     return None
 
@@ -364,6 +379,7 @@ def tables_to_er_diagram() -> str:
         return ""
 
     name_set = set(names)
+    dn_map = _build_display_name_map(name_set)
     lines = ["erDiagram"]
     relations: list[str] = []
 
@@ -377,6 +393,7 @@ def tables_to_er_diagram() -> str:
                 row.get("column_name", ""),
                 name_set,
                 row.get("description", ""),
+                dn_map,
             )
             if target is None or target == name:
                 continue

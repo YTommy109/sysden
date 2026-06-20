@@ -484,6 +484,31 @@ def test_tables_to_er_diagram_description_table_reference() -> None:
     assert "||--o{" in result
 
 
+def test_tables_to_er_diagram_description_via_display_name() -> None:
+    # Arrange — description に日本語表示名「商品種類テーブル」と記述、
+    #           ファイル名は英語 product_types
+    product_types_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    products_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "種類識別子\tUUID\tNO\tNO\tNO\t\t商品種類テーブルの識別子を参照\n"
+    )
+    table_service.write_tsv("product_types", product_types_tsv)
+    table_service.write_markdown("product_types", "## 商品種類\n\n![[product_types.tsv]]")
+    table_service.write_tsv("products", products_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — 表示名経由で product_types → products のリレーションが検出される
+    assert "product_types" in result
+    assert "products" in result
+    assert "||--o{" in result
+
+
 def test_tables_to_er_diagram_description_no_matching_table() -> None:
     # Arrange — description に「注文テーブル」と書いてあるが注文テーブルは存在しない
     products_tsv = (
