@@ -28,6 +28,8 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
     except FileNotFoundError as err:
         raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
 
+    display_name = table_service.read_table_display_name(name)
+
     md_content = table_service.read_markdown(name)
     if md_content is not None:
         expanded = table_service.render_markdown_with_embeds(md_content)
@@ -37,5 +39,7 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
         rendered = _md.render(md_table)
 
     return templates.TemplateResponse(
-        request, "table_detail.html", {"name": name, "rendered": rendered}
+        request,
+        "table_detail.html",
+        {"name": name, "display_name": display_name, "rendered": rendered},
     )

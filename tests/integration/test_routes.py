@@ -74,7 +74,7 @@ def test_table_detail_renders_markdown(
     table_service.write_tsv("users", sample_tsv)
     table_service.write_markdown(
         "users",
-        "# users テーブル\n\nユーザー管理。\n\n## テーブル設計\n\n![[users.tsv]]",
+        "## ユーザー\n\nユーザー管理。\n\n## テーブル設計\n\n![[users.tsv]]",
     )
 
     # When: 詳細ページにアクセスする
@@ -84,6 +84,28 @@ def test_table_detail_renders_markdown(
     assert resp.status_code == 200
     assert "ユーザー管理" in resp.text
     assert "カラム名" in resp.text
+
+
+def test_table_detail_shows_display_name(
+    client: TestClient,
+    sample_tsv: str,
+) -> None:
+    # Given: 日本語見出しの markdown 付きテーブル
+    from app import table_service
+
+    table_service.write_tsv("products", sample_tsv)
+    table_service.write_markdown(
+        "products",
+        "## プロダクト\n\n商品情報。\n\n## テーブル設計\n\n![[products.tsv]]",
+    )
+
+    # When: 詳細ページにアクセスする
+    resp = client.get("/tables/products")
+
+    # Then: h1 と title に日本語表示名が使われる
+    assert resp.status_code == 200
+    assert "<h1>プロダクト</h1>" in resp.text
+    assert "プロダクト — sysden" in resp.text
 
 
 def test_table_detail_without_markdown(
@@ -275,7 +297,8 @@ def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
 
     # Then: 200 が返り index.tsv が生成される
     assert resp.status_code == 200
-    assert table_service.read_index_tables() == ["users"]
+    names = [t["name"] for t in table_service.read_index_tables()]
+    assert names == ["users"]
 
 
 def test_rebuild_er_diagram(client: TestClient, sample_tsv: str) -> None:

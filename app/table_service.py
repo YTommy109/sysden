@@ -115,6 +115,28 @@ def read_markdown(name: str) -> str | None:
     return path.read_text(encoding="utf-8").strip()
 
 
+_HEADING_RE = re.compile(r"^##\s+(.+?)(?:\s+テーブル)?\s*$", re.MULTILINE)
+
+
+def read_table_display_name(name: str) -> str:
+    """テーブルの表示名を markdown の見出しから取得する。
+
+    Args:
+        name: テーブルのファイル名（拡張子なし）。
+
+    Returns:
+        markdown の最初の ## 見出しから取得した表示名。
+        markdown がない場合や見出しがない場合はファイル名をそのまま返す。
+    """
+    md = read_markdown(name)
+    if md is None:
+        return name
+    m = _HEADING_RE.search(md)
+    if m:
+        return m.group(1).strip()
+    return name
+
+
 _EMBED_RE = re.compile(r"!\[\[([A-Za-z0-9_]+\.tsv)\]\]")
 
 
@@ -240,7 +262,10 @@ def rebuild_index_tables() -> None:
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     names = list_tables()
-    lines = ["name"] + names
+    lines = ["name\tdisplay_name"]
+    for name in names:
+        display_name = read_table_display_name(name)
+        lines.append(f"{name}\t{display_name}")
     (d / f"{_INDEX_STEM}.tsv").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -261,18 +286,21 @@ def rebuild_index() -> None:
     rebuild_er_diagram_file()
 
 
-def read_index_tables() -> list[str]:
+def read_index_tables() -> list[dict[str, str]]:
     """index.tsv からテーブル名一覧を読み込む。
 
     Returns:
-        テーブル名のリスト。ファイルが存在しなければ空リスト。
+        name と display_name を含む辞書のリスト。ファイルが存在しなければ空リスト。
     """
     path = get_data_dir() / f"{_INDEX_STEM}.tsv"
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
-        return [row["name"] for row in reader]
+        return [
+            {"name": row["name"], "display_name": row.get("display_name", row["name"])}
+            for row in reader
+        ]
 
 
 def read_er_diagram() -> str:
