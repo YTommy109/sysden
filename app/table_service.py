@@ -26,6 +26,9 @@ def validate_table_name(name: str) -> bool:
     return _TABLE_NAME_RE.fullmatch(name) is not None
 
 
+_PHYSICAL_PREFIX = "physical_"
+
+
 def list_tables() -> list[str]:
     """データディレクトリに存在するテーブル名の一覧を返す。
 
@@ -34,7 +37,11 @@ def list_tables() -> list[str]:
     """
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
-    return sorted(f.stem for f in d.glob("*.tsv") if f.stem != _INDEX_STEM)
+    return sorted(
+        f.stem
+        for f in d.glob("*.tsv")
+        if f.stem != _INDEX_STEM and not f.stem.startswith(_PHYSICAL_PREFIX)
+    )
 
 
 def read_tsv_raw(name: str) -> str:
@@ -294,6 +301,38 @@ def table_exists(name: str) -> bool:
         存在すれば True。
     """
     return (get_data_dir() / f"{name}.tsv").exists()
+
+
+def physical_design_exists(name: str) -> bool:
+    return (get_data_dir() / f"{_PHYSICAL_PREFIX}{name}.tsv").exists()
+
+
+def write_physical_tsv(name: str, tsv_content: str) -> None:
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{_PHYSICAL_PREFIX}{name}.tsv"
+    path.write_text(tsv_content.strip() + "\n", encoding="utf-8")
+
+
+def write_physical_doa_tsv(name: str, tsv_content: str) -> None:
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{_PHYSICAL_PREFIX}{name}_doa.tsv"
+    path.write_text(tsv_content.strip() + "\n", encoding="utf-8")
+
+
+def write_physical_markdown(name: str, content: str) -> None:
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{_PHYSICAL_PREFIX}{name}.md"
+    path.write_text(content.strip() + "\n", encoding="utf-8")
+
+
+def read_physical_markdown(name: str) -> str | None:
+    path = get_data_dir() / f"{_PHYSICAL_PREFIX}{name}.md"
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8").strip()
 
 
 def rebuild_index_tables() -> None:
