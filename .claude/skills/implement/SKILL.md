@@ -41,6 +41,35 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
     """
 ```
 
+## ロギング規約
+
+- Python 標準の `logging` モジュールを使う（`print()` 禁止は Ruff T20 で強制済み）
+- モジュール先頭で `logger = logging.getLogger(__name__)` を定義する
+- LLM による調査がしやすいログを書く:
+  - **操作・入力・結果を 1 行にまとめる**: 何をしたか・何を受け取ったか・どうなったかが 1 行で読めること
+  - **識別子を含める**: テーブル名・リクエスト ID など、ログを grep で絞り込める値を入れる
+  - **失敗時は原因と入力値をセットで出す**: エラーメッセージだけでなく、再現に必要なコンテキストを添える
+
+```python
+logger = logging.getLogger(__name__)
+
+def generate_table_design(table_name: str, prompt: str) -> str:
+    logger.info("AI 生成開始: table=%s prompt_length=%d", table_name, len(prompt))
+    try:
+        result = _call_openai(prompt)
+        logger.info("AI 生成完了: table=%s columns=%d", table_name, len(result.split("\n")))
+        return result
+    except OpenAIError as err:
+        logger.exception("AI 生成失敗: table=%s", table_name)
+        raise
+```
+
+- ログレベルの使い分け:
+  - `DEBUG`: 内部状態の詳細（開発時のみ有用）
+  - `INFO`: 正常な処理の開始・完了
+  - `WARNING`: 想定内だが注意が必要な状態（フォールバック発動など）
+  - `ERROR` / `exception`: 処理失敗（`logger.exception()` でトレースバック付き）
+
 ## エラーハンドリング規約
 
 - ドメイン層・サービス層の失敗は、意味のあるエラー種別（例外クラスまたはエラーコード）で表現する
