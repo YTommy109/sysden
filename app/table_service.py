@@ -250,7 +250,7 @@ def _build_description(row: dict[str, str]) -> str:
 
 def _tsv_to_generic_markdown(rows: list[dict[str, str]]) -> str:
     """任意ヘッダーの TSV を汎用 Markdown テーブルとして変換する。"""
-    headers = list(rows[0].keys())
+    headers = [h for h in rows[0] if h is not None]
     sep = ["---"] * len(headers)
     lines = [
         "| " + " | ".join(headers) + " |",

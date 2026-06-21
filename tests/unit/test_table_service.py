@@ -874,6 +874,21 @@ def test_物理設計DoA_TSVの書き込み(tmp_path: Path) -> None:
     assert "UUID" in path.read_text(encoding="utf-8")
 
 
+def test_汎用TSVレンダラーがデータ行の余分なタブでクラッシュしない(tmp_path: Path) -> None:
+    # Given: ヘッダーより多いフィールドを持つ TSV（AI が末尾タブを余分に返すケース）
+    tsv_content = "column_name\tpython_type\trequired\nid\tUUID\tYES\t\n"
+    table_service.write_physical_doa_tsv("users", tsv_content)
+    rows = table_service.read_tsv("physical_users_doa")
+
+    # When: 汎用 markdown テーブルに変換する
+    result = table_service._tsv_to_generic_markdown(rows)
+
+    # Then: None キーが無視されて正常にレンダリングされる
+    assert "column_name" in result
+    assert "python_type" in result
+    assert "None" not in result
+
+
 def test_テーブル一覧に表示名が含まれる(sample_tsv: str) -> None:
     # Arrange — markdown 付きテーブルを作成
     table_service.write_tsv("products", sample_tsv)
