@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 class TestEndToEndFlow:
     """ユーザーの典型的な操作フロー。"""
 
-    def test_create_view_delete_flow(self, page: Page, base_url: str) -> None:
+    def test_作成から閲覧と削除のフロー(self, page: Page, base_url: str) -> None:
         # Given: テーブルが存在しない状態でトップページを表示する
         page.goto(base_url)
         expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
@@ -43,7 +43,7 @@ class TestEndToEndFlow:
         # Then: 空メッセージが表示される
         expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
 
-    def test_create_then_update_flow(self, page: Page, base_url: str) -> None:
+    def test_作成から更新のフロー(self, page: Page, base_url: str) -> None:
         # Given: ダイアログからテーブルを作成する
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -61,7 +61,7 @@ class TestEndToEndFlow:
         expect(page.locator("h1")).to_be_visible()
         expect(page.locator("#table-view table")).to_be_visible()
 
-    def test_index_link_to_detail(
+    def test_一覧から詳細へのリンク遷移(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する

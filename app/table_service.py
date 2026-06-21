@@ -1,7 +1,10 @@
 import csv
+import logging
 import re
 
 from app.config import get_data_dir
+
+logger = logging.getLogger(__name__)
 
 TSV_HEADERS = ["column_name", "type", "nullable", "pk", "unique", "default", "description"]
 _INDEX_STEM = "index"
@@ -83,6 +86,7 @@ def write_tsv(name: str, tsv_content: str) -> None:
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{name}.tsv"
     path.write_text(tsv_content.strip() + "\n", encoding="utf-8")
+    logger.info("TSV 書き込み: table=%s", name)
 
 
 def delete_table(name: str) -> None:
@@ -96,11 +100,13 @@ def delete_table(name: str) -> None:
     """
     path = get_data_dir() / f"{name}.tsv"
     if not path.exists():
+        logger.warning("テーブル削除失敗: table=%s (存在しない)", name)
         raise FileNotFoundError(f"Table '{name}' not found")
     path.unlink()
     md_path = get_data_dir() / f"{name}.md"
     if md_path.exists():
         md_path.unlink()
+    logger.info("テーブル削除: table=%s", name)
 
 
 def write_markdown(name: str, content: str) -> None:
@@ -114,6 +120,7 @@ def write_markdown(name: str, content: str) -> None:
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{name}.md"
     path.write_text(content.strip() + "\n", encoding="utf-8")
+    logger.info("Markdown 書き込み: table=%s", name)
 
 
 def read_markdown(name: str) -> str | None:
@@ -316,6 +323,7 @@ def rebuild_index() -> None:
     """
     rebuild_index_tables()
     rebuild_er_diagram_file()
+    logger.info("インデックス再構築完了")
 
 
 def read_index_tables() -> list[dict[str, str]]:
