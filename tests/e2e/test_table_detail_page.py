@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 class TestTableDetailDisplay:
     """テーブル詳細ページの表示要素。"""
 
-    def test_shows_table_name_heading(
+    def test_テーブル名の見出しが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -20,7 +20,7 @@ class TestTableDetailDisplay:
         # Then: h1 にテーブル名が表示される
         expect(page.locator("h1")).to_have_text("users")
 
-    def test_shows_page_title(
+    def test_ページタイトルが正しい(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -32,7 +32,7 @@ class TestTableDetailDisplay:
         # Then: ページタイトルが正しい
         expect(page).to_have_title("users — sysden")
 
-    def test_shows_back_icon(
+    def test_戻るアイコンが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -45,7 +45,7 @@ class TestTableDetailDisplay:
         back_link = page.locator('a[href="/"][aria-label="一覧に戻る"]')
         expect(back_link).to_be_visible()
 
-    def test_shows_rendered_table(
+    def test_テーブルがレンダリングされる(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -65,7 +65,7 @@ class TestTableDetailDisplay:
         # Then: データ行に "id" が含まれる（PK は太字で表示）
         expect(table_view.locator("td >> strong", has_text="id")).to_be_visible()
 
-    def test_shows_update_form(
+    def test_更新フォームが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -85,7 +85,7 @@ class TestTableDetailDisplay:
         # Then: 更新ボタンが存在する
         expect(form.locator('button[type="submit"]')).to_have_text("更新を依頼")
 
-    def test_shows_update_heading(
+    def test_更新依頼の見出しが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -97,7 +97,7 @@ class TestTableDetailDisplay:
         # Then: "AI に更新を依頼" 見出しが表示される
         expect(page.locator("h2", has_text="AI に更新を依頼")).to_be_visible()
 
-    def test_nav_link_exists(
+    def test_ナビバーリンクが存在する(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -109,7 +109,7 @@ class TestTableDetailDisplay:
         # Then: ナビバーの sysden リンクが / を指す
         expect(page.locator('nav a[href="/"]')).to_be_visible()
 
-    def test_shows_markdown_description(
+    def test_Markdown説明が表示される(
         self, page: Page, base_url: str, create_table_auto: Callable[..., None]
     ) -> None:
         # Given: テーブルがテストモードで作成される（AI が名前 + TSV + markdown を生成）
@@ -128,7 +128,7 @@ class TestTableDetailDisplay:
 class TestTableDetailUpdate:
     """テーブル更新フォームの操作。"""
 
-    def test_update_redirects_to_same_page(
+    def test_更新後に同じページへリダイレクト(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在し詳細ページを表示中
@@ -146,7 +146,7 @@ class TestTableDetailUpdate:
         # Then: テーブルが表示される
         expect(page.locator("#table-view table")).to_be_visible()
 
-    def test_update_submit_button_disables_during_request(
+    def test_更新送信ボタンがリクエスト中にdisabledになる(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在し詳細ページを表示中
@@ -168,7 +168,7 @@ class TestTableDetailUpdate:
 class TestTableDetailNavigation:
     """テーブル詳細ページからのナビゲーション。"""
 
-    def test_back_icon_goes_to_index(
+    def test_戻るアイコンで一覧に遷移する(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
@@ -182,7 +182,7 @@ class TestTableDetailNavigation:
         page.wait_for_url(f"{base_url}/")
         expect(page.locator("h1")).to_have_text("テーブル一覧")
 
-    def test_nav_logo_goes_to_index(
+    def test_ナビロゴで一覧に遷移する(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
@@ -200,7 +200,7 @@ class TestTableDetailNavigation:
 class TestTableDetailError:
     """テーブル詳細ページのエラーケース。"""
 
-    def test_nonexistent_table_returns_error(self, page: Page, base_url: str) -> None:
+    def test_存在しないテーブルで404(self, page: Page, base_url: str) -> None:
         # Given: テーブル "nonexistent" が存在しない
 
         # When: 存在しないテーブルの詳細ページにアクセスする

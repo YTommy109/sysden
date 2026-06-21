@@ -19,7 +19,7 @@ def mock_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
 
 
-def test_index_returns_html(client: TestClient) -> None:
+def test_トップページがHTMLを返す(client: TestClient) -> None:
     # Given: アプリが起動している
 
     # When: トップページにアクセスする
@@ -30,7 +30,7 @@ def test_index_returns_html(client: TestClient) -> None:
     assert "text/html" in resp.headers["content-type"]
 
 
-def test_table_detail_404(client: TestClient) -> None:
+def test_存在しないテーブルの詳細は404(client: TestClient) -> None:
     # Given: 存在しないテーブル名
 
     # When: テーブル詳細ページにアクセスする
@@ -40,7 +40,7 @@ def test_table_detail_404(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
-def test_create_table_via_ai(
+def test_AI経由でテーブルを作成する(
     client: TestClient,
     mock_openai: None,
 ) -> None:
@@ -64,7 +64,7 @@ def test_create_table_via_ai(
     assert md is not None
 
 
-def test_table_detail_renders_markdown(
+def test_詳細ページでMarkdownがレンダリングされる(
     client: TestClient,
     sample_tsv: str,
 ) -> None:
@@ -86,7 +86,7 @@ def test_table_detail_renders_markdown(
     assert "カラム名" in resp.text
 
 
-def test_table_detail_shows_display_name(
+def test_詳細ページに日本語表示名が表示される(
     client: TestClient,
     sample_tsv: str,
 ) -> None:
@@ -108,7 +108,7 @@ def test_table_detail_shows_display_name(
     assert "プロダクト — sysden" in resp.text
 
 
-def test_table_detail_without_markdown(
+def test_Markdownなしの詳細ページでTSVのみ表示(
     client: TestClient,
     sample_tsv: str,
 ) -> None:
@@ -125,7 +125,7 @@ def test_table_detail_without_markdown(
     assert "カラム名" in resp.text
 
 
-def test_create_table_conflict(
+def test_同名テーブル作成で409(
     client: TestClient,
     mock_openai: None,
     sample_tsv: str,
@@ -145,7 +145,7 @@ def test_create_table_conflict(
     assert resp.status_code == 409
 
 
-def test_update_table_via_ai(
+def test_AI経由でテーブルを更新する(
     client: TestClient,
     mock_openai: None,
     sample_tsv: str,
@@ -167,7 +167,7 @@ def test_update_table_via_ai(
     assert "users" in resp.text
 
 
-def test_update_table_404(client: TestClient, mock_openai: None) -> None:
+def test_存在しないテーブルの更新は404(client: TestClient, mock_openai: None) -> None:
     # Given: テーブルが存在しない
 
     # When: 存在しないテーブルの更新 API にリクエストを送る
@@ -180,7 +180,7 @@ def test_update_table_404(client: TestClient, mock_openai: None) -> None:
     assert resp.status_code == 404
 
 
-def test_delete_table(
+def test_テーブルを削除する(
     client: TestClient,
     sample_tsv: str,
 ) -> None:
@@ -197,7 +197,7 @@ def test_delete_table(
     assert resp.json() == {"status": "deleted", "name": "users"}
 
 
-def test_create_multiple_tables_via_ai(
+def test_AI経由で複数テーブルを作成する(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -237,7 +237,7 @@ def test_create_multiple_tables_via_ai(
     assert table_service.read_markdown("orders") is not None
 
 
-def test_create_multiple_tables_conflict(
+def test_複数テーブル作成で既存テーブルと競合(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
     sample_tsv: str,
@@ -276,7 +276,7 @@ def test_create_multiple_tables_conflict(
     assert not table_service.table_exists("users")
 
 
-def test_delete_table_404(client: TestClient) -> None:
+def test_存在しないテーブルの削除は404(client: TestClient) -> None:
     # Given: テーブルが存在しない
 
     # When: 存在しないテーブルの削除 API にリクエストを送る
@@ -300,7 +300,7 @@ class TestTableNameValidation:
             "-dash",
         ],
     )
-    def test_create_table_invalid_name_returns_422(
+    def test_不正なテーブル名の作成は422(
         self, client: TestClient, mock_openai: None, name: str
     ) -> None:
         # Given: 不正なテーブル名
@@ -318,7 +318,7 @@ class TestTableNameValidation:
         "name",
         [".hidden", "UPPER", "123start"],
     )
-    def test_update_table_invalid_name_returns_422(
+    def test_不正なテーブル名の更新は422(
         self, client: TestClient, mock_openai: None, name: str
     ) -> None:
         # Given: 不正なテーブル名（スラッシュなし — スラッシュ含みはルーティングで 404）
@@ -336,7 +336,7 @@ class TestTableNameValidation:
         "name",
         [".hidden", "UPPER", "123start"],
     )
-    def test_delete_table_invalid_name_returns_422(self, client: TestClient, name: str) -> None:
+    def test_不正なテーブル名の削除は422(self, client: TestClient, name: str) -> None:
         # Given: 不正なテーブル名（スラッシュなし — スラッシュ含みはルーティングで 404）
 
         # When: 不正な名前でテーブル削除 API にリクエストを送る
@@ -345,7 +345,7 @@ class TestTableNameValidation:
         # Then: 422 が返る
         assert resp.status_code == 422
 
-    def test_path_traversal_with_slash_blocked_by_router(self, client: TestClient) -> None:
+    def test_スラッシュ含みのパストラバーサルはルーターで拒否(self, client: TestClient) -> None:
         # Given: スラッシュ含みのパストラバーサル名
 
         # When: スラッシュ含みの名前で API にリクエストを送る
@@ -358,7 +358,7 @@ class TestTableNameValidation:
         "name",
         ["users", "order_items", "a", "users2", "t" * 64],
     )
-    def test_valid_table_names_accepted(
+    def test_正当なテーブル名は受け入れられる(
         self, client: TestClient, mock_openai: None, name: str
     ) -> None:
         # Given: 正当なテーブル名
@@ -374,7 +374,7 @@ class TestTableNameValidation:
         assert resp.status_code != 422
 
 
-def test_create_multiple_tables_rolls_back_on_write_failure(
+def test_複数テーブル作成の書き込み失敗でロールバック(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Given: AI が 2 テーブルを返すが、2 件目の書き込みで失敗する
@@ -429,7 +429,9 @@ class TestHtmxHxRedirect:
 
     HX_HEADERS = {"HX-Request": "true"}
 
-    def test_create_table_returns_hx_redirect(self, client: TestClient, mock_openai: None) -> None:
+    def test_テーブル作成でHXリダイレクトを返す(
+        self, client: TestClient, mock_openai: None
+    ) -> None:
         # Given: AI モックが有効な状態
 
         # When: HX-Request ヘッダー付きでテーブル作成する
@@ -444,7 +446,7 @@ class TestHtmxHxRedirect:
         assert resp.status_code == 200
         assert "/tables/users" in resp.headers["HX-Redirect"]
 
-    def test_update_table_returns_hx_redirect(
+    def test_テーブル更新でHXリダイレクトを返す(
         self, client: TestClient, mock_openai: None, sample_tsv: str
     ) -> None:
         # Given: テーブルが存在する
@@ -471,7 +473,9 @@ class TestHtmxHxRedirect:
             ("/api/rebuild-er-diagram", "#er-diagram"),
         ],
     )
-    def test_rebuild_returns_sse_fragment(self, client: TestClient, url: str, target: str) -> None:
+    def test_リビルドでSSEフラグメントを返す(
+        self, client: TestClient, url: str, target: str
+    ) -> None:
         # Given: アプリが起動している
 
         # When: HX-Request ヘッダー付きでリビルドする
@@ -493,7 +497,9 @@ class TestSseEndpoints:
         "url",
         ["/api/sse/rebuild-index", "/api/sse/rebuild-er"],
     )
-    def test_sse_endpoint_returns_event_stream(self, client: TestClient, url: str) -> None:
+    def test_SSEエンドポイントがイベントストリームを返す(
+        self, client: TestClient, url: str
+    ) -> None:
         # Given: アプリが起動している
 
         # When: SSE エンドポイントに GET する
@@ -514,7 +520,7 @@ class TestSseEndpoints:
             ("/api/sse/rebuild-er", "rebuild_er_diagram_file"),
         ],
     )
-    def test_sse_endpoint_sends_event_even_on_error(
+    def test_エラー時もSSEイベントが送信される(
         self,
         client: TestClient,
         monkeypatch: pytest.MonkeyPatch,
@@ -538,7 +544,7 @@ class TestSseEndpoints:
             assert "event: complete" in body
 
 
-def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
+def test_テーブル一覧を再作成する(client: TestClient, sample_tsv: str) -> None:
     # Given: テーブルが存在するが index.tsv がない
     from app import table_service
 
@@ -553,7 +559,7 @@ def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
     assert names == ["users"]
 
 
-def test_rebuild_er_diagram(client: TestClient, sample_tsv: str) -> None:
+def test_ER図を再作成する(client: TestClient, sample_tsv: str) -> None:
     # Given: テーブルが存在するが index.mmd がない
     from app import table_service
 

@@ -41,6 +41,12 @@ def create_table(
     prompt: Annotated[str, Form()],
     name: Annotated[str | None, Form()] = None,
 ) -> Response:
+    """AI にテーブル設計を生成させ、ファイルに書き込む。
+
+    名前指定時は単一テーブル、未指定時は AI がテーブル名も決定する。
+    複数テーブル生成時、途中で失敗したら作成済みファイルをロールバックする。
+    """
+    logger.info("テーブル作成リクエスト: name=%s prompt_length=%d", name, len(prompt))
     if name is None:
         tables = ai_service.create_table_design(prompt)
     else:
@@ -64,6 +70,7 @@ def create_table(
             table_service.delete_table(written_name)
         raise
     table_service.rebuild_index()
+    logger.info("テーブル作成完了: tables=%s", [t[0] for t in tables])
     redirect_url = f"/tables/{tables[0][0]}" if len(tables) == 1 else "/"
     if request.headers.get("HX-Request"):
         return Response(headers={"HX-Redirect": redirect_url})
@@ -76,6 +83,8 @@ def update_table(
     request: Request,
     prompt: Annotated[str, Form()],
 ) -> Response:
+    """既存テーブルの定義を AI に更新させる。"""
+    logger.info("テーブル更新リクエスト: table=%s prompt_length=%d", name, len(prompt))
     _check_table_name(name)
     try:
         current_tsv = table_service.read_tsv_raw(name)
@@ -83,6 +92,7 @@ def update_table(
         raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
     tsv = ai_service.generate_table_design(prompt, current_tsv)
     table_service.write_tsv(name, tsv)
+    logger.info("テーブル更新完了: table=%s", name)
     redirect_url = f"/tables/{name}"
     if request.headers.get("HX-Request"):
         return Response(headers={"HX-Redirect": redirect_url})
@@ -109,12 +119,14 @@ def rebuild_er_diagram(request: Request) -> Response:
 
 @router.delete("/tables/{name}")
 def delete_table(name: str) -> dict[str, str]:
+    """テーブルの TSV と markdown を削除し、インデックスを再構築する。"""
     _check_table_name(name)
     try:
         table_service.delete_table(name)
     except FileNotFoundError as err:
         raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
     table_service.rebuild_index()
+    logger.info("テーブル削除完了: table=%s", name)
     return {"status": "deleted", "name": name}
 
 
@@ -143,9 +155,11 @@ async def _sse_rebuild(func: Callable[[], object]) -> StreamingResponse:
 
 @router.get("/sse/rebuild-index")
 async def sse_rebuild_index() -> StreamingResponse:
+    """テーブル一覧再構築の SSE エンドポイント。"""
     return await _sse_rebuild(table_service.rebuild_index)
 
 
 @router.get("/sse/rebuild-er")
 async def sse_rebuild_er() -> StreamingResponse:
+    """ER 図再構築の SSE エンドポイント。"""
     return await _sse_rebuild(table_service.rebuild_er_diagram_file)

@@ -1,9 +1,12 @@
+import logging
 import os
 import re
 from pathlib import Path
 
 import yaml
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 _STUB_TSV = (
     "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -98,9 +101,12 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
     Returns:
         生成されたカラム定義の TSV 文字列。
     """
+    mode = "update" if current_tsv else "create"
     if os.environ.get("SYSDEN_TEST_MODE") == "1":
+        logger.info("AI テーブル設計生成スキップ (テストモード): mode=%s", mode)
         return _STUB_TSV
 
+    logger.info("AI テーブル設計生成開始: mode=%s prompt_length=%d", mode, len(prompt))
     config = _load_prompts()["table_design"]
 
     user_message = prompt
@@ -108,15 +114,21 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
         user_message = config["user_update_template"].format(current_tsv=current_tsv, prompt=prompt)
 
     client = get_client()
-    response = client.chat.completions.create(
-        model=config["model"],
-        messages=[
-            {"role": "system", "content": config["system"]},
-            {"role": "user", "content": user_message},
-        ],
-        temperature=config["temperature"],
-    )
-    return response.choices[0].message.content or ""
+    try:
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": config["system"]},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=config["temperature"],
+        )
+    except Exception:
+        logger.exception("AI テーブル設計生成失敗: mode=%s", mode)
+        raise
+    result = response.choices[0].message.content or ""
+    logger.info("AI テーブル設計生成完了: mode=%s result_length=%d", mode, len(result))
+    return result
 
 
 def create_table_design(prompt: str) -> list[tuple[str, str, str]]:
@@ -129,17 +141,25 @@ def create_table_design(prompt: str) -> list[tuple[str, str, str]]:
         ``(テーブル名, TSV 文字列, markdown 文字列)`` のリスト。
     """
     if os.environ.get("SYSDEN_TEST_MODE") == "1":
+        logger.info("AI テーブル作成スキップ (テストモード)")
         return [("stub_table", _STUB_TSV, _STUB_MD)]
 
+    logger.info("AI テーブル作成開始: prompt_length=%d", len(prompt))
     config = _load_prompts()["table_create"]
     client = get_client()
-    response = client.chat.completions.create(
-        model=config["model"],
-        messages=[
-            {"role": "system", "content": config["system"]},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=config["temperature"],
-    )
-    content = response.choices[0].message.content or ""
-    return _parse_multi_table_response(content)
+    try:
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": config["system"]},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=config["temperature"],
+        )
+        content = response.choices[0].message.content or ""
+        tables = _parse_multi_table_response(content)
+    except Exception:
+        logger.exception("AI テーブル作成失敗")
+        raise
+    logger.info("AI テーブル作成完了: tables=%d", len(tables))
+    return tables

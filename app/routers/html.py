@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
@@ -7,6 +8,8 @@ from markdown_it import MarkdownIt
 
 from app import table_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 templates = Jinja2Templates(directory=str(Path(__file__).parent.parent.parent / "templates"))
 _md = MarkdownIt("commonmark", {"html": True}).enable("table")
@@ -14,6 +17,7 @@ _md = MarkdownIt("commonmark", {"html": True}).enable("table")
 
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
+    """テーブル一覧ページを表示する。"""
     tables = table_service.read_index_tables()
     er_diagram = table_service.read_er_diagram()
     return templates.TemplateResponse(
@@ -23,6 +27,10 @@ def index(request: Request) -> HTMLResponse:
 
 @router.get("/tables/{name}", response_class=HTMLResponse)
 def table_detail(name: str, request: Request) -> HTMLResponse:
+    """テーブル詳細ページを表示する。
+
+    markdown が存在する場合は埋め込み TSV を展開してレンダリングする。
+    """
     if not table_service.validate_table_name(name):
         raise HTTPException(status_code=422, detail=f"Invalid table name: '{name}'")
     try:

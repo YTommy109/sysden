@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from app import ai_service
@@ -56,7 +58,7 @@ def mock_openai(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     return calls
 
 
-def test_generate_table_design_calls_openai(mock_openai: list[dict]) -> None:
+def test_AI生成でOpenAIが呼ばれる(mock_openai: list[dict]) -> None:
     # Arrange — fixture がモックを注入済み
 
     # Act
@@ -68,7 +70,7 @@ def test_generate_table_design_calls_openai(mock_openai: list[dict]) -> None:
     assert len(mock_openai) == 1
 
 
-def test_generate_table_design_includes_current_tsv(mock_openai: list[dict]) -> None:
+def test_更新モードで現在のTSVがプロンプトに含まれる(mock_openai: list[dict]) -> None:
     # Arrange
     current = "column_name\ttype\n"
 
@@ -80,7 +82,7 @@ def test_generate_table_design_includes_current_tsv(mock_openai: list[dict]) -> 
     assert any("現在のテーブル定義" in m["content"] for m in msgs)
 
 
-def test_get_client_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_APIキー未設定でValueError(monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
@@ -89,7 +91,7 @@ def test_get_client_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
         ai_service.get_client()
 
 
-def test_create_table_design_single_table(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_単一テーブルの生成(monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     fake = make_fake_openai_client(tsv=SINGLE_TABLE_RESPONSE)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
@@ -105,7 +107,7 @@ def test_create_table_design_single_table(monkeypatch: pytest.MonkeyPatch) -> No
     assert "![[users.tsv]]" in md
 
 
-def test_create_table_design_multiple_tables(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_複数テーブルの生成(monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     fake = make_fake_openai_client(tsv=MULTI_TABLE_RESPONSE)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
@@ -121,7 +123,7 @@ def test_create_table_design_multiple_tables(monkeypatch: pytest.MonkeyPatch) ->
     assert "![[orders.tsv]]" in tables[1][2]
 
 
-def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_テストモードでスタブを返す(monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
 
@@ -137,10 +139,68 @@ def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     assert f"![[{name}.tsv]]" in md
 
 
+class TestAiServiceLogging:
+    """AI サービスのログ出力検証。"""
+
+    def test_生成開始と完了がログ出力される(
+        self, mock_openai: list[dict], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Arrange — fixture がモックを注入済み
+
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.ai_service"):
+            ai_service.generate_table_design("ユーザーテーブル")
+
+        # Assert
+        assert "AI テーブル設計生成開始: mode=create" in caplog.text
+        assert "AI テーブル設計生成完了: mode=create" in caplog.text
+
+    def test_更新モードのログにupdateが含まれる(
+        self, mock_openai: list[dict], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Arrange
+        current = "column_name\ttype\n"
+
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.ai_service"):
+            ai_service.generate_table_design("カラムを追加", current)
+
+        # Assert
+        assert "mode=update" in caplog.text
+
+    def test_テーブル作成の開始と完了がログ出力される(
+        self, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Arrange
+        fake = make_fake_openai_client(tsv=SINGLE_TABLE_RESPONSE)
+        monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.ai_service"):
+            ai_service.create_table_design("ユーザーテーブルを作って")
+
+        # Assert
+        assert "AI テーブル作成開始" in caplog.text
+        assert "AI テーブル作成完了: tables=1" in caplog.text
+
+    def test_テストモードのログ出力(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Arrange
+        monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
+
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.ai_service"):
+            ai_service.generate_table_design("テスト")
+
+        # Assert
+        assert "テストモード" in caplog.text
+
+
 class TestParseMultiTableResponse:
     """_parse_multi_table_response のユニットテスト。"""
 
-    def test_single_table(self) -> None:
+    def test_単一テーブルをパースする(self) -> None:
         # Act
         result = ai_service._parse_multi_table_response(SINGLE_TABLE_RESPONSE)
 
@@ -151,7 +211,7 @@ class TestParseMultiTableResponse:
         assert "id\tUUID" in tsv
         assert "![[users.tsv]]" in md
 
-    def test_multiple_tables(self) -> None:
+    def test_複数テーブルをパースする(self) -> None:
         # Act
         result = ai_service._parse_multi_table_response(MULTI_TABLE_RESPONSE)
 
@@ -162,7 +222,7 @@ class TestParseMultiTableResponse:
         assert "![[users.tsv]]" in result[0][2]
         assert "![[orders.tsv]]" in result[1][2]
 
-    def test_strips_whitespace(self) -> None:
+    def test_前後の空白を除去する(self) -> None:
         # Arrange
         text = (
             "\n\n[users]\ncolumn_name\ttype\nid\tUUID\n\n[users.md]\n# users\n\n![[users.tsv]]\n\n"
@@ -175,12 +235,12 @@ class TestParseMultiTableResponse:
         assert len(result) == 1
         assert result[0][0] == "users"
 
-    def test_empty_response_raises(self) -> None:
+    def test_空レスポンスでValueError(self) -> None:
         # Act & Assert
         with pytest.raises(ValueError, match="テーブル定義"):
             ai_service._parse_multi_table_response("")
 
-    def test_no_section_header_raises(self) -> None:
+    def test_セクションヘッダーなしでValueError(self) -> None:
         # Act & Assert
         with pytest.raises(ValueError, match="テーブル定義"):
             ai_service._parse_multi_table_response("column_name\ttype\nid\tUUID\n")

@@ -1,9 +1,14 @@
+import logging
+from collections.abc import Callable
+from typing import Any
+
 import pytest
 
 from app import table_service
+from app.table_service import _translate_type
 
 
-def test_list_tables_empty() -> None:
+def test_テーブルが空ならリストも空() -> None:
     # Arrange — 空のデータディレクトリ（conftest が tmp_path を設定済み）
 
     # Act
@@ -13,7 +18,7 @@ def test_list_tables_empty() -> None:
     assert result == []
 
 
-def test_write_and_read_tsv(sample_tsv: str) -> None:
+def test_TSVの書き込みと読み込み(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
 
@@ -25,15 +30,22 @@ def test_write_and_read_tsv(sample_tsv: str) -> None:
     assert rows[0]["type"] == "UUID"
 
 
-def test_read_tsv_not_found() -> None:
+@pytest.mark.parametrize(
+    "read_func",
+    [table_service.read_tsv, table_service.read_tsv_raw],
+    ids=["read_tsv", "read_tsv_raw"],
+)
+def test_存在しないテーブルのTSV読み込みはFileNotFoundError(
+    read_func: Callable[..., Any],
+) -> None:
     # Arrange — テーブルが存在しない状態
 
     # Act & Assert
     with pytest.raises(FileNotFoundError, match="nonexistent"):
-        table_service.read_tsv("nonexistent")
+        read_func("nonexistent")
 
 
-def test_read_tsv_raw(sample_tsv: str) -> None:
+def test_TSVを生文字列で読み込む(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
 
@@ -45,15 +57,7 @@ def test_read_tsv_raw(sample_tsv: str) -> None:
     assert "id\tUUID" in content
 
 
-def test_read_tsv_raw_not_found() -> None:
-    # Arrange — テーブルが存在しない状態
-
-    # Act & Assert
-    with pytest.raises(FileNotFoundError, match="nonexistent"):
-        table_service.read_tsv_raw("nonexistent")
-
-
-def test_delete_table(sample_tsv: str) -> None:
+def test_テーブルを削除する(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("orders", sample_tsv)
 
@@ -64,7 +68,7 @@ def test_delete_table(sample_tsv: str) -> None:
     assert not table_service.table_exists("orders")
 
 
-def test_delete_table_not_found() -> None:
+def test_存在しないテーブルの削除はFileNotFoundError() -> None:
     # Arrange — テーブルが存在しない状態
 
     # Act & Assert
@@ -72,7 +76,7 @@ def test_delete_table_not_found() -> None:
         table_service.delete_table("nonexistent")
 
 
-def test_tsv_to_markdown() -> None:
+def test_TSVをMarkdownテーブルに変換する() -> None:
     # Arrange
     rows = [
         {
@@ -100,7 +104,7 @@ def test_tsv_to_markdown() -> None:
     assert "---" in md
 
 
-def test_tsv_to_markdown_required_prefix_on_type() -> None:
+def test_必須カラムの型に必須マークが付く() -> None:
     # Arrange
     rows = [
         {
@@ -134,7 +138,7 @@ def test_tsv_to_markdown_required_prefix_on_type() -> None:
     assert "| テキスト |" in memo_line
 
 
-def test_tsv_to_markdown_pk_makes_column_name_bold() -> None:
+def test_PKカラム名が太字になる() -> None:
     # Arrange
     rows = [
         {
@@ -165,98 +169,31 @@ def test_tsv_to_markdown_pk_makes_column_name_bold() -> None:
     assert "| name |" in md
 
 
-def test_tsv_to_markdown_translates_types() -> None:
-    # Arrange
-    rows = [
-        {
-            "column_name": "a",
-            "type": "DATE",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "b",
-            "type": "VARCHAR(255)",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "c",
-            "type": "DECIMAL(10,2)",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "d",
-            "type": "INTEGER",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "e",
-            "type": "TEXT",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "f",
-            "type": "BOOLEAN",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "g",
-            "type": "TIMESTAMPTZ",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-        {
-            "column_name": "h",
-            "type": "UUID",
-            "nullable": "YES",
-            "pk": "NO",
-            "unique": "NO",
-            "default": "",
-            "description": "",
-        },
-    ]
-
-    # Act
-    md = table_service.tsv_to_markdown(rows)
-
-    # Assert — 型が日本語に変換される（パラメータは保持）
-    assert "| 日付 |" in md
-    assert "| 文字列(255) |" in md
-    assert "| 固定小数点数(10,2) |" in md
-    assert "| 整数 |" in md
-    assert "| テキスト |" in md
-    assert "| 真偽値 |" in md
-    assert "| タイムスタンプ |" in md
-    assert "| UUID |" in md
+@pytest.mark.parametrize(
+    ("input_type", "expected"),
+    [
+        ("DATE", "日付"),
+        ("VARCHAR", "文字列"),
+        ("VARCHAR(255)", "文字列(255)"),
+        ("DECIMAL", "固定小数点数"),
+        ("DECIMAL(10,2)", "固定小数点数(10,2)"),
+        ("INTEGER", "整数"),
+        ("INT", "整数"),
+        ("BIGINT", "整数"),
+        ("SMALLINT", "整数"),
+        ("TEXT", "テキスト"),
+        ("BOOLEAN", "真偽値"),
+        ("TIMESTAMPTZ", "タイムスタンプ"),
+        ("TIMESTAMP", "タイムスタンプ"),
+        ("UUID", "UUID"),
+        ("CUSTOM_TYPE", "CUSTOM_TYPE"),
+    ],
+)
+def test_型名が日本語に変換される(input_type: str, expected: str) -> None:
+    assert _translate_type(input_type) == expected
 
 
-def test_tsv_to_markdown_fk_column_has_fk_class(sample_tsv: str) -> None:
+def test_FKカラムにfkクラスが付く(sample_tsv: str) -> None:
     # Arrange — users テーブルを作成して user_id カラムを持つ行を表示
     table_service.write_tsv("users", sample_tsv)
     rows = [
@@ -278,7 +215,7 @@ def test_tsv_to_markdown_fk_column_has_fk_class(sample_tsv: str) -> None:
     assert '<span class="fk">user_id</span>' in md
 
 
-def test_tsv_to_markdown_non_fk_column_no_fk_class() -> None:
+def test_非FKカラムにfkクラスは付かない() -> None:
     # Arrange — FK でない通常カラム
     rows = [
         {
@@ -299,7 +236,7 @@ def test_tsv_to_markdown_non_fk_column_no_fk_class() -> None:
     assert "fk" not in md
 
 
-def test_tsv_to_markdown_description_without_default_prefix() -> None:
+def test_説明にデフォルトプレフィックスが付かない() -> None:
     # Arrange
     rows = [
         {
@@ -323,7 +260,7 @@ def test_tsv_to_markdown_description_without_default_prefix() -> None:
     assert "デフォルト:" not in data_line
 
 
-def test_tsv_to_markdown_empty() -> None:
+def test_空リストでプレースホルダを返す() -> None:
     # Arrange — 空リスト
 
     # Act
@@ -333,7 +270,7 @@ def test_tsv_to_markdown_empty() -> None:
     assert result == "_（カラム定義なし）_"
 
 
-def test_table_exists(sample_tsv: str) -> None:
+def test_テーブルの存在確認(sample_tsv: str) -> None:
     # Arrange — テーブルが存在しない状態
     assert not table_service.table_exists("foo")
 
@@ -344,7 +281,7 @@ def test_table_exists(sample_tsv: str) -> None:
     assert table_service.table_exists("foo")
 
 
-def test_tables_to_er_diagram_empty() -> None:
+def test_テーブルなしでER図は空文字列() -> None:
     # Arrange — テーブルが存在しない
 
     # Act
@@ -354,7 +291,7 @@ def test_tables_to_er_diagram_empty() -> None:
     assert result == ""
 
 
-def test_tables_to_er_diagram_single(sample_tsv: str) -> None:
+def test_単一テーブルのER図(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
 
@@ -366,7 +303,7 @@ def test_tables_to_er_diagram_single(sample_tsv: str) -> None:
     assert "users" in result
 
 
-def test_tables_to_er_diagram_multiple(sample_tsv: str) -> None:
+def test_複数テーブルのER図(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
@@ -379,7 +316,7 @@ def test_tables_to_er_diagram_multiple(sample_tsv: str) -> None:
     assert "orders" in result
 
 
-def test_tables_to_er_diagram_fk_relationship() -> None:
+def test_FK関係がER図に含まれる() -> None:
     # Arrange — orders.user_id が users テーブルを参照する
     users_tsv = (
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -402,7 +339,7 @@ def test_tables_to_er_diagram_fk_relationship() -> None:
     assert "||--o{" in result
 
 
-def test_tables_to_er_diagram_nullable_fk() -> None:
+def test_nullableなFKはオプショナル線になる() -> None:
     # Arrange — orders.coupon_id が nullable で coupons を参照する
     coupons_tsv = (
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -423,7 +360,7 @@ def test_tables_to_er_diagram_nullable_fk() -> None:
     assert "|o--o{" in result
 
 
-def test_tables_to_er_diagram_no_matching_table() -> None:
+def test_参照先テーブルがなければリレーション線なし() -> None:
     # Arrange — category_id があるが categories テーブルは存在しない
     products_tsv = (
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -440,7 +377,7 @@ def test_tables_to_er_diagram_no_matching_table() -> None:
     assert "|o--o{" not in result
 
 
-def test_tables_to_er_diagram_singular_table_match() -> None:
+def test_単数形テーブル名でFK一致() -> None:
     # Arrange — items.order_id → order テーブル（単数形で一致）
     order_tsv = (
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -461,7 +398,7 @@ def test_tables_to_er_diagram_singular_table_match() -> None:
     assert "||--o{" in result
 
 
-def test_tables_to_er_diagram_description_table_reference() -> None:
+def test_descriptionのテーブル参照でFK検出() -> None:
     # Arrange — 「種類識別子」カラムの description に「商品種類テーブル」と記述
     product_types_tsv = (
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -484,7 +421,7 @@ def test_tables_to_er_diagram_description_table_reference() -> None:
     assert "||--o{" in result
 
 
-def test_tables_to_er_diagram_description_via_display_name() -> None:
+def test_表示名経由のテーブル参照でFK検出() -> None:
     # Arrange — description に日本語表示名「商品種類テーブル」と記述、
     #           ファイル名は英語 product_types
     product_types_tsv = (
@@ -509,7 +446,7 @@ def test_tables_to_er_diagram_description_via_display_name() -> None:
     assert "||--o{" in result
 
 
-def test_tables_to_er_diagram_description_no_matching_table() -> None:
+def test_descriptionの参照先がなければリレーション線なし() -> None:
     # Arrange — description に「注文テーブル」と書いてあるが注文テーブルは存在しない
     products_tsv = (
         "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -526,7 +463,7 @@ def test_tables_to_er_diagram_description_no_matching_table() -> None:
     assert "|o--o{" not in result
 
 
-def test_tables_to_er_diagram_id_suffix_takes_precedence() -> None:
+def test_idサフィックスがdescription参照より優先() -> None:
     # Arrange — _id サフィックスと description 両方でリレーションが検出可能な場合
     #           _id サフィックスが優先される
     users_tsv = (
@@ -554,7 +491,7 @@ def test_tables_to_er_diagram_id_suffix_takes_precedence() -> None:
     assert "categories" not in result.split("\n")[-1]
 
 
-def test_list_tables_excludes_index(sample_tsv: str) -> None:
+def test_テーブル一覧にindexは含まれない(sample_tsv: str) -> None:
     # Arrange — index.tsv が存在する状態
     table_service.write_tsv("users", sample_tsv)
     table_service.rebuild_index()
@@ -567,7 +504,7 @@ def test_list_tables_excludes_index(sample_tsv: str) -> None:
     assert "users" in result
 
 
-def test_rebuild_index_creates_files(sample_tsv: str) -> None:
+def test_インデックス再構築でファイルが生成される(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
@@ -583,7 +520,7 @@ def test_rebuild_index_creates_files(sample_tsv: str) -> None:
     assert (d / "index.mmd").exists()
 
 
-def test_rebuild_index_empty() -> None:
+def test_テーブルなしでもインデックスファイルが生成される() -> None:
     # Arrange — テーブルが存在しない
 
     # Act
@@ -597,7 +534,7 @@ def test_rebuild_index_empty() -> None:
     assert (d / "index.mmd").exists()
 
 
-def test_read_index_tables(sample_tsv: str) -> None:
+def test_インデックスからテーブル一覧を読み込む(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
@@ -612,7 +549,7 @@ def test_read_index_tables(sample_tsv: str) -> None:
     assert result[1]["name"] == "users"
 
 
-def test_read_index_tables_empty() -> None:
+def test_空のインデックスは空リスト() -> None:
     # Arrange — テーブルなしで index を構築
     table_service.rebuild_index()
 
@@ -623,7 +560,7 @@ def test_read_index_tables_empty() -> None:
     assert result == []
 
 
-def test_read_index_tables_no_file() -> None:
+def test_インデックスファイルがなければ空リスト() -> None:
     # Arrange — index.tsv が存在しない
 
     # Act
@@ -633,7 +570,7 @@ def test_read_index_tables_no_file() -> None:
     assert result == []
 
 
-def test_read_er_diagram(sample_tsv: str) -> None:
+def test_ER図を読み込む(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
     table_service.rebuild_index()
@@ -646,7 +583,7 @@ def test_read_er_diagram(sample_tsv: str) -> None:
     assert "users" in result
 
 
-def test_read_er_diagram_empty() -> None:
+def test_テーブルなしのER図は空文字列() -> None:
     # Arrange — テーブルなしで index を構築
     table_service.rebuild_index()
 
@@ -657,7 +594,7 @@ def test_read_er_diagram_empty() -> None:
     assert result == ""
 
 
-def test_read_er_diagram_no_file() -> None:
+def test_ER図ファイルがなければ空文字列() -> None:
     # Arrange — index.mmd が存在しない
 
     # Act
@@ -667,7 +604,7 @@ def test_read_er_diagram_no_file() -> None:
     assert result == ""
 
 
-def test_rebuild_index_tables_creates_tsv(sample_tsv: str) -> None:
+def test_テーブル一覧再構築でTSVが生成される(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
@@ -685,7 +622,7 @@ def test_rebuild_index_tables_creates_tsv(sample_tsv: str) -> None:
     assert names == ["orders", "users"]
 
 
-def test_rebuild_index_tables_empty() -> None:
+def test_テーブルなしでもテーブル一覧TSVが生成される() -> None:
     # Arrange — テーブルが存在しない
 
     # Act
@@ -699,7 +636,7 @@ def test_rebuild_index_tables_empty() -> None:
     assert table_service.read_index_tables() == []
 
 
-def test_rebuild_er_diagram_file_creates_mmd(sample_tsv: str) -> None:
+def test_ER図再構築でmmdファイルが生成される(sample_tsv: str) -> None:
     # Arrange
     table_service.write_tsv("users", sample_tsv)
 
@@ -717,7 +654,7 @@ def test_rebuild_er_diagram_file_creates_mmd(sample_tsv: str) -> None:
     assert "users" in result
 
 
-def test_rebuild_er_diagram_file_empty() -> None:
+def test_テーブルなしでも空のmmdファイルが生成される() -> None:
     # Arrange — テーブルが存在しない
 
     # Act
@@ -731,7 +668,7 @@ def test_rebuild_er_diagram_file_empty() -> None:
     assert table_service.read_er_diagram() == ""
 
 
-def test_write_and_read_markdown() -> None:
+def test_Markdownの書き込みと読み込み() -> None:
     # Arrange
     content = "# users\n\nユーザー管理テーブル。\n\n![[users.tsv]]"
 
@@ -743,7 +680,7 @@ def test_write_and_read_markdown() -> None:
     assert result == content
 
 
-def test_read_markdown_not_found() -> None:
+def test_存在しないMarkdownはNone() -> None:
     # Arrange — markdown が存在しない
 
     # Act
@@ -753,7 +690,7 @@ def test_read_markdown_not_found() -> None:
     assert result is None
 
 
-def test_render_markdown_with_embeds(sample_tsv: str) -> None:
+def test_埋め込みTSVがMarkdownテーブルに展開される(sample_tsv: str) -> None:
     # Arrange — TSV を書き込み、埋め込みリンクを含む markdown を用意
     table_service.write_tsv("users", sample_tsv)
     content = "# users\n\n説明文。\n\n![[users.tsv]]"
@@ -767,7 +704,7 @@ def test_render_markdown_with_embeds(sample_tsv: str) -> None:
     assert "| **id** |" in result
 
 
-def test_render_markdown_with_embeds_no_embed() -> None:
+def test_埋め込みなしのMarkdownはそのまま返る() -> None:
     # Arrange — 埋め込みリンクがない markdown
     content = "# users\n\n説明文のみ。"
 
@@ -778,7 +715,7 @@ def test_render_markdown_with_embeds_no_embed() -> None:
     assert result == content
 
 
-def test_render_markdown_with_embeds_missing_tsv() -> None:
+def test_存在しないTSVの埋め込みはプレースホルダになる() -> None:
     # Arrange — 参照先の TSV が存在しない
     content = "# missing\n\n![[missing.tsv]]"
 
@@ -790,7 +727,7 @@ def test_render_markdown_with_embeds_missing_tsv() -> None:
     assert "missing.tsv" in result
 
 
-def test_render_markdown_with_embeds_ignores_path_traversal() -> None:
+def test_パストラバーサルの埋め込みは展開されない() -> None:
     # Arrange — パストラバーサルを含む埋め込みリンク
     content = "# test\n\n![[../../etc/passwd.tsv]]"
 
@@ -801,7 +738,7 @@ def test_render_markdown_with_embeds_ignores_path_traversal() -> None:
     assert "![[../../etc/passwd.tsv]]" in result
 
 
-def test_delete_table_also_deletes_markdown(sample_tsv: str) -> None:
+def test_テーブル削除でMarkdownも削除される(sample_tsv: str) -> None:
     # Arrange — TSV と markdown の両方を作成
     table_service.write_tsv("orders", sample_tsv)
     table_service.write_markdown("orders", "# orders\n\n![[orders.tsv]]")
@@ -814,7 +751,7 @@ def test_delete_table_also_deletes_markdown(sample_tsv: str) -> None:
     assert table_service.read_markdown("orders") is None
 
 
-def test_read_table_display_name_from_markdown() -> None:
+def test_Markdownの見出しから表示名を取得する() -> None:
     # Arrange — h1 日本語見出しを持つ markdown
     table_service.write_markdown(
         "products", "# プロダクト\n\n## 概要\n\n説明。\n\n![[products.tsv]]"
@@ -827,28 +764,27 @@ def test_read_table_display_name_from_markdown() -> None:
     assert result == "プロダクト"
 
 
-def test_read_table_display_name_no_markdown() -> None:
-    # Arrange — markdown がない
+@pytest.mark.parametrize(
+    ("name", "md_content"),
+    [
+        ("missing", None),
+        ("notes", "## 概要\n\n本文のみ。"),
+    ],
+    ids=["Markdownなし", "h1見出しなし"],
+)
+def test_表示名が取得できない場合はファイル名を返す(name: str, md_content: str | None) -> None:
+    # Arrange
+    if md_content is not None:
+        table_service.write_markdown(name, md_content)
 
     # Act
-    result = table_service.read_table_display_name("missing")
+    result = table_service.read_table_display_name(name)
 
     # Assert — ファイル名をそのまま返す
-    assert result == "missing"
+    assert result == name
 
 
-def test_read_table_display_name_no_heading() -> None:
-    # Arrange — h1 見出しがない markdown
-    table_service.write_markdown("notes", "## 概要\n\n本文のみ。")
-
-    # Act
-    result = table_service.read_table_display_name("notes")
-
-    # Assert — ファイル名をそのまま返す
-    assert result == "notes"
-
-
-def test_strip_title_heading() -> None:
+def test_タイトル見出しを除去する() -> None:
     # Arrange
     content = "# プロダクト\n\n## 概要\n\n説明文。"
 
@@ -860,7 +796,7 @@ def test_strip_title_heading() -> None:
     assert result.startswith("## 概要")
 
 
-def test_strip_title_heading_no_h1() -> None:
+def test_h1がなければそのまま返る() -> None:
     # Arrange — h1 がない場合はそのまま返る
     content = "## 概要\n\n説明文。"
 
@@ -871,7 +807,7 @@ def test_strip_title_heading_no_h1() -> None:
     assert result == content
 
 
-def test_rebuild_index_tables_includes_display_name(sample_tsv: str) -> None:
+def test_テーブル一覧に表示名が含まれる(sample_tsv: str) -> None:
     # Arrange — markdown 付きテーブルを作成
     table_service.write_tsv("products", sample_tsv)
     table_service.write_markdown("products", "# プロダクト\n\n## 概要\n\n![[products.tsv]]")
@@ -885,7 +821,7 @@ def test_rebuild_index_tables_includes_display_name(sample_tsv: str) -> None:
     assert tables[0]["display_name"] == "プロダクト"
 
 
-def test_rebuild_index_tables_fallback_display_name(sample_tsv: str) -> None:
+def test_Markdownなしの表示名はファイル名(sample_tsv: str) -> None:
     # Arrange — markdown なしのテーブル
     table_service.write_tsv("users", sample_tsv)
 
@@ -896,3 +832,59 @@ def test_rebuild_index_tables_fallback_display_name(sample_tsv: str) -> None:
     tables = table_service.read_index_tables()
     assert tables[0]["name"] == "users"
     assert tables[0]["display_name"] == "users"
+
+
+class TestTableServiceLogging:
+    """テーブルサービスのログ出力検証。"""
+
+    def test_TSV書き込み時にテーブル名がログ出力される(
+        self, sample_tsv: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.table_service"):
+            table_service.write_tsv("users", sample_tsv)
+
+        # Assert
+        assert "TSV 書き込み: table=users" in caplog.text
+
+    def test_テーブル削除時にテーブル名がログ出力される(
+        self, sample_tsv: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Arrange
+        table_service.write_tsv("orders", sample_tsv)
+
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.table_service"):
+            table_service.delete_table("orders")
+
+        # Assert
+        assert "テーブル削除: table=orders" in caplog.text
+
+    def test_存在しないテーブル削除で警告ログが出る(self, caplog: pytest.LogCaptureFixture) -> None:
+        # Act
+        with (
+            caplog.at_level(logging.WARNING, logger="app.table_service"),
+            pytest.raises(FileNotFoundError),
+        ):
+            table_service.delete_table("nonexistent")
+
+        # Assert
+        assert "テーブル削除失敗: table=nonexistent" in caplog.text
+
+    def test_Markdown書き込み時にテーブル名がログ出力される(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.table_service"):
+            table_service.write_markdown("users", "# users\n\n説明")
+
+        # Assert
+        assert "Markdown 書き込み: table=users" in caplog.text
+
+    def test_インデックス再構築完了がログ出力される(self, caplog: pytest.LogCaptureFixture) -> None:
+        # Act
+        with caplog.at_level(logging.INFO, logger="app.table_service"):
+            table_service.rebuild_index()
+
+        # Assert
+        assert "インデックス再構築完了" in caplog.text

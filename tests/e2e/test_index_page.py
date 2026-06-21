@@ -17,7 +17,7 @@ def _capture_and_dismiss(messages: list[str]) -> Callable[[Dialog], None]:
 class TestIndexPageEmpty:
     """テーブルが存在しない状態でのトップページ。"""
 
-    def test_shows_empty_message(self, page: Page, base_url: str) -> None:
+    def test_空メッセージが表示される(self, page: Page, base_url: str) -> None:
         # Given: テーブルが1件も存在しない
 
         # When: トップページにアクセスする
@@ -26,28 +26,28 @@ class TestIndexPageEmpty:
         # Then: 空メッセージが表示される
         expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
 
-    def test_shows_page_title(self, page: Page, base_url: str) -> None:
+    def test_ページタイトルが正しい(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
         # Then: タイトルに "テーブル一覧" が含まれる
         expect(page).to_have_title("テーブル一覧 — sysden")
 
-    def test_shows_heading(self, page: Page, base_url: str) -> None:
+    def test_見出しが表示される(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
         # Then: 見出し "テーブル一覧" が表示される
         expect(page.locator("h1")).to_have_text("テーブル一覧")
 
-    def test_shows_add_button(self, page: Page, base_url: str) -> None:
+    def test_テーブル追加ボタンが表示される(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
         # Then: "テーブル追加" ボタンが表示される
         expect(page.locator('button:has-text("テーブル追加")')).to_be_visible()
 
-    def test_dialog_closed_by_default(self, page: Page, base_url: str) -> None:
+    def test_ダイアログは初期状態で閉じている(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
@@ -55,7 +55,7 @@ class TestIndexPageEmpty:
         dialog = page.locator("#create-dialog")
         expect(dialog).not_to_be_visible()
 
-    def test_dialog_opens_on_button_click(self, page: Page, base_url: str) -> None:
+    def test_ボタンクリックでダイアログが開く(self, page: Page, base_url: str) -> None:
         # Given: トップページにアクセスする
         page.goto(base_url)
 
@@ -66,7 +66,7 @@ class TestIndexPageEmpty:
         dialog = page.locator("#create-dialog")
         expect(dialog).to_be_visible()
 
-    def test_dialog_has_form_fields(self, page: Page, base_url: str) -> None:
+    def test_ダイアログにフォーム要素がある(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いた状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -81,7 +81,7 @@ class TestIndexPageEmpty:
         expect(submit_btn).to_be_visible()
         expect(submit_btn).to_have_text("依頼を送信")
 
-    def test_dialog_form_action_points_to_api(self, page: Page, base_url: str) -> None:
+    def test_フォームのactionがAPIを指す(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いた状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -91,7 +91,7 @@ class TestIndexPageEmpty:
         expect(form).to_be_visible()
         expect(form).to_have_attribute("method", "post")
 
-    def test_dialog_cancel_closes(self, page: Page, base_url: str) -> None:
+    def test_キャンセルでダイアログが閉じる(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いた状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -103,7 +103,7 @@ class TestIndexPageEmpty:
         # Then: ダイアログが閉じる
         expect(page.locator("#create-dialog")).not_to_be_visible()
 
-    def test_no_er_diagram_when_empty(self, page: Page, base_url: str) -> None:
+    def test_テーブルなしでER図は非表示(self, page: Page, base_url: str) -> None:
         # Given: テーブルが存在しない
 
         # When: トップページにアクセスする
@@ -112,7 +112,7 @@ class TestIndexPageEmpty:
         # Then: ER 図の mermaid コンテンツが表示されない
         expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
-    def test_nav_link_to_home(self, page: Page, base_url: str) -> None:
+    def test_ナビバーにホームリンクがある(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
@@ -125,7 +125,7 @@ class TestIndexPageEmpty:
 class TestIndexPageWithTables:
     """テーブルが存在する状態でのトップページ。"""
 
-    def test_shows_table_row(
+    def test_テーブル行が表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -138,7 +138,7 @@ class TestIndexPageWithTables:
         row = page.locator("#table-list tbody tr", has_text="users")
         expect(row).to_be_visible()
 
-    def test_table_name_links_to_detail(
+    def test_テーブル名が詳細ページへのリンク(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -152,7 +152,7 @@ class TestIndexPageWithTables:
         expect(link).to_be_visible()
         expect(link).to_have_text("users")
 
-    def test_row_has_delete_button(
+    def test_行に削除ボタンがある(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -166,7 +166,7 @@ class TestIndexPageWithTables:
         delete_btn = row.locator("button", has_text="削除")
         expect(delete_btn).to_be_visible()
 
-    def test_empty_message_not_shown(
+    def test_空メッセージが非表示(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -178,7 +178,7 @@ class TestIndexPageWithTables:
         # Then: 空メッセージが表示されない
         expect(page.locator("text=テーブル設計はまだありません。")).not_to_be_visible()
 
-    def test_multiple_tables_shown(
+    def test_複数テーブルが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" と "orders" が存在する
@@ -192,7 +192,7 @@ class TestIndexPageWithTables:
         expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
         expect(page.locator("#table-list tbody tr", has_text="orders")).to_be_visible()
 
-    def test_er_diagram_shown(
+    def test_ER図セクションが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在する
@@ -204,7 +204,7 @@ class TestIndexPageWithTables:
         # Then: ER 図セクションが表示される
         expect(page.locator("#er-diagram")).to_be_visible()
 
-    def test_er_diagram_contains_table_names(
+    def test_ER図にテーブル名が含まれる(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" と "orders" が存在する
@@ -223,7 +223,7 @@ class TestIndexPageWithTables:
 class TestCreateTableDialog:
     """テーブル新規作成ダイアログの操作。"""
 
-    def test_create_redirects_to_detail(self, page: Page, base_url: str) -> None:
+    def test_作成後に詳細ページへリダイレクト(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いた状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -236,7 +236,7 @@ class TestCreateTableDialog:
         page.wait_for_url("**/tables/*")
         expect(page.locator("h1")).to_be_visible()
 
-    def test_prompt_required_validation(self, page: Page, base_url: str) -> None:
+    def test_依頼文が空なら送信されない(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いた状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -247,7 +247,7 @@ class TestCreateTableDialog:
         # Then: ページ遷移しない（HTML required バリデーション）
         expect(page).to_have_url(base_url + "/")
 
-    def test_submit_via_meta_enter(self, page: Page, base_url: str) -> None:
+    def test_MetaEnterで送信できる(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いて依頼文を入力した状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -261,7 +261,7 @@ class TestCreateTableDialog:
         page.wait_for_url("**/tables/*")
         expect(page.locator("h1")).to_be_visible()
 
-    def test_submit_via_ctrl_enter(self, page: Page, base_url: str) -> None:
+    def test_CtrlEnterで送信できる(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いて依頼文を入力した状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -275,7 +275,7 @@ class TestCreateTableDialog:
         page.wait_for_url("**/tables/*")
         expect(page.locator("h1")).to_be_visible()
 
-    def test_created_table_appears_on_index(self, page: Page, base_url: str) -> None:
+    def test_作成したテーブルが一覧に表示される(self, page: Page, base_url: str) -> None:
         # Given: ダイアログからテーブルを作成する
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -293,7 +293,7 @@ class TestCreateTableDialog:
 class TestRebuildButtons:
     """テーブル一覧・ER 図の再作成ボタン。"""
 
-    def test_rebuild_index_tables_button_visible(self, page: Page, base_url: str) -> None:
+    def test_テーブル一覧再作成ボタンが表示される(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
@@ -301,7 +301,7 @@ class TestRebuildButtons:
         btn = page.locator('button[aria-label="テーブル一覧の再作成"]')
         expect(btn).to_be_visible()
 
-    def test_rebuild_er_diagram_button_visible(self, page: Page, base_url: str) -> None:
+    def test_ER図再作成ボタンが表示される(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
@@ -309,7 +309,7 @@ class TestRebuildButtons:
         btn = page.locator('button[aria-label="ER 図の再作成"]')
         expect(btn).to_be_visible()
 
-    def test_rebuild_index_tables_restores_list(
+    def test_テーブル一覧再作成でリストが復元される(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在するが index.tsv がない
@@ -327,7 +327,7 @@ class TestRebuildButtons:
         # Then: テーブル行が表示される
         expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
 
-    def test_rebuild_index_tables_also_restores_er_diagram(
+    def test_テーブル一覧再作成でER図も復元される(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在するが index.tsv も index.mmd もない
@@ -345,7 +345,7 @@ class TestRebuildButtons:
         # Then: ER 図も再作成されて表示される
         expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
 
-    def test_rebuild_er_diagram_restores_diagram(
+    def test_ER図再作成でER図が復元される(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在するが index.mmd がない
@@ -367,7 +367,7 @@ class TestRebuildButtons:
 class TestButtonEffects:
     """ボタンの非活性化と回転アニメーション。"""
 
-    def test_create_submit_button_disables_during_request(self, page: Page, base_url: str) -> None:
+    def test_作成送信ボタンがリクエスト中にdisabledになる(self, page: Page, base_url: str) -> None:
         # Given: ダイアログを開いて依頼文を入力した状態
         page.goto(base_url)
         page.locator('button:has-text("テーブル追加")').click()
@@ -383,7 +383,7 @@ class TestButtonEffects:
         # Cleanup: ページ遷移を待つ
         page.wait_for_url("**/tables/*")
 
-    def test_rebuild_index_button_shows_spinning_and_disables(
+    def test_テーブル一覧再作成ボタンが回転しdisabledになる(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在する
@@ -407,7 +407,7 @@ class TestButtonEffects:
         # Then: SSE 完了後にテーブル一覧が復元される
         expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
 
-    def test_rebuild_er_button_shows_spinning_and_disables(
+    def test_ER図再作成ボタンが回転しdisabledになる(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在する
@@ -431,7 +431,7 @@ class TestButtonEffects:
         # Then: SSE 完了後に ER 図が復元される
         expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
 
-    def test_rebuild_button_restores_after_completion(
+    def test_テーブル一覧再作成ボタンが完了後に復元される(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在する
@@ -451,7 +451,7 @@ class TestButtonEffects:
         expect(btn).to_be_enabled()
         expect(btn.locator("img.spinning")).not_to_be_visible()
 
-    def test_rebuild_er_button_restores_after_completion(
+    def test_ER図再作成ボタンが完了後に復元される(
         self, page: Page, base_url: str, e2e_data_dir: Path
     ) -> None:
         # Given: テーブル TSV が存在する
@@ -475,7 +475,7 @@ class TestButtonEffects:
 class TestDeleteTable:
     """テーブル削除（htmx hx-delete + hx-confirm）。"""
 
-    def test_delete_shows_confirm_dialog(
+    def test_削除で確認ダイアログが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在しトップページを表示中
@@ -494,7 +494,7 @@ class TestDeleteTable:
         assert "users" in dialog_messages[0]
         assert "削除" in dialog_messages[0]
 
-    def test_delete_cancel_keeps_row(
+    def test_削除キャンセルで行が残る(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在しトップページを表示中
@@ -510,7 +510,7 @@ class TestDeleteTable:
         page.wait_for_timeout(500)
         expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
 
-    def test_delete_accept_removes_row(
+    def test_削除承認で行が消える(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル "users" が存在しトップページを表示中
