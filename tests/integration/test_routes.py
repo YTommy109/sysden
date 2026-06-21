@@ -633,3 +633,87 @@ def test_ER図を再作成する(client: TestClient, sample_tsv: str) -> None:
     assert resp.status_code == 200
     er = table_service.read_er_diagram()
     assert "erDiagram" in er
+
+
+def test_物理設計ページが未生成時に空状態を表示する(
+    client: TestClient,
+    sample_tsv: str,
+) -> None:
+    # Given: 論理設計のみ存在し物理設計は未生成
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
+
+    # When: 物理設計ページにアクセスする
+    resp = client.get("/tables/users/physical")
+
+    # Then: 200 が返り生成ボタンが表示される
+    assert resp.status_code == 200
+    assert "まだ物理設計がありません" in resp.text
+    assert "/api/tables/users/physical" in resp.text
+
+
+def test_物理設計ページが生成済みの内容を表示する(
+    client: TestClient,
+    sample_tsv: str,
+) -> None:
+    # Given: 論理設計と物理設計の両方が存在する
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
+    table_service.write_physical_tsv(
+        "users",
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tuuid\tNO\tYES\tYES\tgen_random_uuid()\t主キー\n",
+    )
+    table_service.write_physical_doa_tsv(
+        "users",
+        "column_name\tpython_type\trequired\tmin\tmax\tmax_length\tdescription\n"
+        "id\tUUID\tYES\t\t\t\t\n",
+    )
+    table_service.write_physical_markdown(
+        "users",
+        "# 物理設計\n\n## テーブル定義\n\n![[physical_users.tsv]]\n\n"
+        "## DoA バリデーション\n\n![[physical_users_doa.tsv]]",
+    )
+
+    # When: 物理設計ページにアクセスする
+    resp = client.get("/tables/users/physical")
+
+    # Then: 200 が返り物理設計の内容が表示される
+    assert resp.status_code == 200
+    assert "uuid" in resp.text
+    assert "UUID" in resp.text
+    assert "まだ物理設計がありません" not in resp.text
+
+
+def test_論理設計が存在しないテーブルの物理設計ページは404(
+    client: TestClient,
+) -> None:
+    # Given: テーブルが存在しない
+
+    # When: 物理設計ページにアクセスする
+    resp = client.get("/tables/nonexistent/physical")
+
+    # Then: 404 が返る
+    assert resp.status_code == 404
+
+
+def test_論理設計ページに物理設計リンクがある(
+    client: TestClient,
+    sample_tsv: str,
+) -> None:
+    # Given: テーブルが存在する
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
+
+    # When: 論理設計ページにアクセスする
+    resp = client.get("/tables/users")
+
+    # Then: 物理設計ページへのリンクが存在する
+    assert resp.status_code == 200
+    assert "/tables/users/physical" in resp.text

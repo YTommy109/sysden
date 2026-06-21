@@ -237,7 +237,21 @@ def _translate_type(raw_type: str) -> str:
 
 def _build_description(row: dict[str, str]) -> str:
     """description を説明セルとして返す。"""
-    return row.get("description", "")
+    return row.get("description") or ""
+
+
+def _tsv_to_generic_markdown(rows: list[dict[str, str]]) -> str:
+    """任意ヘッダーの TSV を汎用 Markdown テーブルとして変換する。"""
+    headers = list(rows[0].keys())
+    sep = ["---"] * len(headers)
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(sep) + " |",
+    ]
+    for row in rows:
+        cells = [str(row.get(h) or "") for h in headers]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
 
 
 def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
@@ -246,6 +260,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     TSV の 7 列（column_name, type, nullable, pk, unique, default, description）を
     表示用の 4 列（カラム名, 型, ユニーク, 説明）にマッピングする。
     型名は日本語に変換し、必須は * プレフィックス、PK は太字、FK は薄色で表現する。
+    論理設計列（type）を持たない TSV は汎用テーブルとして出力する。
 
     Args:
         rows: カラム定義の辞書リスト。空の場合はプレースホルダを返す。
@@ -255,6 +270,9 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     """
     if not rows:
         return "_（カラム定義なし）_"
+
+    if "type" not in rows[0]:
+        return _tsv_to_generic_markdown(rows)
 
     table_names = set(list_tables())
     dn_map = _build_display_name_map(table_names)
@@ -433,7 +451,7 @@ def _resolve_fk_target(
             if candidate in table_names:
                 return candidate
 
-    match = re.search(r"(.+?)テーブル", description)
+    match = re.search(r"(.+?)テーブル", description or "")
     if match:
         ref = match.group(1)
         if ref in table_names:
