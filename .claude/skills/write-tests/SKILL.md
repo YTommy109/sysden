@@ -18,11 +18,46 @@ description: テストコード（unit / integration / E2E）を追加・修正�
   2. HTML 構造・API のステータスコードは FastAPI `TestClient` 統合テスト
   3. ドメインロジック単体は pytest ユニットテスト
 
+## 作業フェーズ
+
+テストコードの追加・修正は以下の順で行う:
+
+1. **実装フェーズ**: テストを書いて通す（TDD）
+2. **リファクタリングフェーズ**: テストが全て通った後に以下を確認する
+   - `@pytest.mark.parametrize` を使うべき箇所がないか（同じロジックを複数入力で検証するテスト）
+   - テストケースの網羅性は十分か（正常系・異常系・境界値が揃っているか）
+   - parametrize に変換した場合、既存テストが壊れないことを確認する
+
 ## 共通規約
 
 - **unittest より pytest を優先**: `unittest.mock.patch` / `MagicMock` ではなく `monkeypatch` / `pytest.fixture` を使う
 - pytest fixture が適したところでは積極的に活用する（テストデータ、モック注入など）
+- **`@pytest.mark.parametrize` を積極的に使う**: 入力パターンが 2 つ以上ある関数テストは parametrize で書く
 - `uv run pytest tests/unit -q` は 60 秒以内に完了すること
+
+### parametrize の使い方
+
+同じアサーション構造で入力だけが異なるテストは個別関数にせず parametrize にまとめる:
+
+```python
+@pytest.mark.parametrize(
+    ("input_type", "expected"),
+    [
+        ("VARCHAR", "文字列"),
+        ("INTEGER", "整数"),
+        ("BOOLEAN", "真偽値"),
+        ("UNKNOWN", "UNKNOWN"),  # マッチしない場合はそのまま返す
+    ],
+)
+def test_translate_type(input_type: str, expected: str) -> None:
+    assert _translate_type(input_type) == expected
+```
+
+parametrize を使うべき典型的なケース:
+- 複数の有効入力に対して同じ正常結果を期待する
+- 複数の無効入力に対して同じエラー（ステータスコード / 例外）を期待する
+- 境界値テスト（最小・最大・境界+1）
+- 型変換・マッピングのテスト
 
 ## ユニットテスト（`tests/unit/`）
 

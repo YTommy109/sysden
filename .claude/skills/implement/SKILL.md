@@ -6,8 +6,19 @@ sysden のプロダクトコード（`app/` 配下）を追加・変更すると
 
 - 型アノテーションを必ず付ける（引数・戻り値）。`Optional[X]` ではなく `X | None` を使う
 - `except` 節で例外を再送出するときは `raise ... from err` または `raise ... from None` を使う
-- 値による分岐は `if-elif` チェーンではなく `match-case` 文を優先する
 - テーブル名は `validate_table_name()` で検証する（`^[a-z][a-z0-9_]{0,63}$`）
+
+## Python 3.14 モダン構文の積極活用
+
+Python 3.14 の新しい文法・機能を積極的に使う。古い書き方より新しい書き方を常に優先する:
+
+- **match-case**: `if-elif` チェーンではなく `match-case` 文を優先する
+- **型構文**: `Union[X, Y]` → `X | Y`、`Optional[X]` → `X | None`、`dict[str, int]` など小文字ジェネリクス
+- **構造的パターンマッチング**: 辞書・タプル・クラスのデストラクチャリングに `match-case` を活用する
+- **例外グループ**: 複数例外の同時処理には `except*` を検討する
+- **f-string**: 文字列結合や `format()` ではなく f-string を使う
+- **walrus 演算子**: `if (m := re.match(...))` のように代入と条件判定を一行にまとめられる場合は使う
+- **TypeAlias / type 文**: 複雑な型には `type` 文でエイリアスを定義する
 
 ## docstring・コメント規約
 
