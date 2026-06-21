@@ -286,6 +286,94 @@ def test_delete_table_404(client: TestClient) -> None:
     assert resp.status_code == 404
 
 
+class TestTableNameValidation:
+    """テーブル名バリデーション — パストラバーサル防止。"""
+
+    @pytest.mark.parametrize(
+        "name",
+        [
+            ".hidden",
+            "has space",
+            "UPPER",
+            "123start",
+            "a" * 65,
+            "-dash",
+        ],
+    )
+    def test_create_table_invalid_name_returns_422(
+        self, client: TestClient, mock_openai: None, name: str
+    ) -> None:
+        # Given: 不正なテーブル名
+
+        # When: 不正な名前でテーブル作成 API にリクエストを送る
+        resp = client.post(
+            "/api/tables",
+            data={"name": name, "prompt": "テスト"},
+        )
+
+        # Then: 422 が返る
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize(
+        "name",
+        [".hidden", "UPPER", "123start"],
+    )
+    def test_update_table_invalid_name_returns_422(
+        self, client: TestClient, mock_openai: None, name: str
+    ) -> None:
+        # Given: 不正なテーブル名（スラッシュなし — スラッシュ含みはルーティングで 404）
+
+        # When: 不正な名前でテーブル更新 API にリクエストを送る
+        resp = client.post(
+            f"/api/tables/{name}",
+            data={"prompt": "カラムを追加"},
+        )
+
+        # Then: 422 が返る
+        assert resp.status_code == 422
+
+    @pytest.mark.parametrize(
+        "name",
+        [".hidden", "UPPER", "123start"],
+    )
+    def test_delete_table_invalid_name_returns_422(self, client: TestClient, name: str) -> None:
+        # Given: 不正なテーブル名（スラッシュなし — スラッシュ含みはルーティングで 404）
+
+        # When: 不正な名前でテーブル削除 API にリクエストを送る
+        resp = client.delete(f"/api/tables/{name}")
+
+        # Then: 422 が返る
+        assert resp.status_code == 422
+
+    def test_path_traversal_with_slash_blocked_by_router(self, client: TestClient) -> None:
+        # Given: スラッシュ含みのパストラバーサル名
+
+        # When: スラッシュ含みの名前で API にリクエストを送る
+        resp = client.post("/api/tables/../etc/passwd", data={"prompt": "test"})
+
+        # Then: ルーティングレベルで拒否される（ハンドラに到達しない）
+        assert resp.status_code in (404, 405)
+
+    @pytest.mark.parametrize(
+        "name",
+        ["users", "order_items", "a", "users2", "t" * 64],
+    )
+    def test_valid_table_names_accepted(
+        self, client: TestClient, mock_openai: None, name: str
+    ) -> None:
+        # Given: 正当なテーブル名
+
+        # When: 正当な名前でテーブル作成 API にリクエストを送る
+        resp = client.post(
+            "/api/tables",
+            data={"name": name, "prompt": "テスト"},
+            follow_redirects=True,
+        )
+
+        # Then: 422 以外が返る（作成成功）
+        assert resp.status_code != 422
+
+
 def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
     # Given: テーブルが存在するが index.tsv がない
     from app import table_service

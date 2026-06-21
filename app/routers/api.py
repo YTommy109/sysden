@@ -8,6 +8,14 @@ from app import ai_service, table_service
 router = APIRouter(prefix="/api")
 
 
+def _check_table_name(name: str) -> None:
+    if not table_service.validate_table_name(name):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid table name: '{name}'",
+        )
+
+
 @router.post("/tables")
 def create_table(
     prompt: Annotated[str, Form()],
@@ -16,10 +24,12 @@ def create_table(
     if name is None:
         tables = ai_service.create_table_design(prompt)
     else:
+        _check_table_name(name)
         tsv = ai_service.generate_table_design(prompt)
         default_md = f"# {name}\n\n## 概要\n\n## テーブル設計\n\n![[{name}.tsv]]\n"
         tables = [(name, tsv, default_md)]
     for tbl_name, _, _ in tables:
+        _check_table_name(tbl_name)
         if table_service.table_exists(tbl_name):
             raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
     for tbl_name, tbl_tsv, tbl_md in tables:
@@ -37,6 +47,7 @@ def update_table(
     name: str,
     prompt: Annotated[str, Form()],
 ) -> RedirectResponse:
+    _check_table_name(name)
     try:
         current_tsv = table_service.read_tsv_raw(name)
     except FileNotFoundError as err:
@@ -63,6 +74,7 @@ def rebuild_er_diagram() -> RedirectResponse:
 
 @router.delete("/tables/{name}")
 def delete_table(name: str) -> dict[str, str]:
+    _check_table_name(name)
     try:
         table_service.delete_table(name)
     except FileNotFoundError as err:

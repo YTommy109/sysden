@@ -4,36 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}sysden{% endblock %}</title>
-  <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; background: #f9f9f9; }
-    nav { background: #1a1a2e; color: white; padding: 0.75rem 1.5rem; }
-    nav a { color: white; text-decoration: none; font-weight: bold; }
-    .container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
-    table { border-collapse: collapse; width: 100%; background: white; }
-    th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
-    th { background: #f0f0f0; white-space: nowrap; }
-    #table-view td:first-child { white-space: nowrap; }
-    .required { color: red; font-weight: bold; }
-    .fk { color: #999; }
-    table.striped tbody tr:nth-child(odd) { background: #fff; }
-    table.striped tbody tr:nth-child(even) { background: #f5f5fa; }
-    form { margin: 1rem 0; }
-    input, textarea { padding: 0.5rem; width: 100%; box-sizing: border-box; margin-bottom: 0.5rem; }
-    button { padding: 0.5rem 1.5rem; background: #1a1a2e; color: white; border: none; cursor: pointer; }
-    button:hover { background: #2a2a4e; }
-    .card { background: white; border: 1px solid #ddd; padding: 1rem; margin-bottom: 0.75rem; border-radius: 4px; }
-    dialog { border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; max-width: 480px; width: 100%; }
-    dialog::backdrop { background: rgba(0,0,0,0.4); }
-  </style>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   <nav><a href="/">sysden</a></nav>
   <div class="container">{% block content %}{% endblock %}</div>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://unpkg.com/hyperscript.org@0.9.14" defer></script>
-  <script type="module">
-    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-    mermaid.initialize({ startOnLoad: true });
-  </script>
+  <script type="module" src="/static/js/mermaid-init.js"></script>
 </body>
 </html>

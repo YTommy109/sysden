@@ -5,6 +5,22 @@ from app.config import get_data_dir
 
 TSV_HEADERS = ["column_name", "type", "nullable", "pk", "unique", "default", "description"]
 _INDEX_STEM = "index"
+_TABLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def validate_table_name(name: str) -> bool:
+    """テーブル名が安全な形式か検証する。
+
+    英小文字で始まり、英小文字・数字・アンダースコアのみで構成され、
+    1〜64 文字であること。
+
+    Args:
+        name: テーブル名。
+
+    Returns:
+        有効なら True。
+    """
+    return _TABLE_NAME_RE.fullmatch(name) is not None
 
 
 def list_tables() -> list[str]:
