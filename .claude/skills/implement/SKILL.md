@@ -1,123 +1,67 @@
 # sysden 実装スキル
 
-sysden に新機能を追加または既存コードを変更するときの制約。
+sysden のプロダクトコード（`app/` 配下）を追加・変更するときの規約。
 
-## Anthropic Agent SDK の使い方
+## Python コーディング規約
 
-**ANTHROPIC_API_KEY を環境変数に設定しない**。SDK はサブスクリプション認証で動作する。
-設定されていると Max プランの枠外で API 課金が発生する。
+- 型アノテーションを必ず付ける（引数・戻り値）。`Optional[X]` ではなく `X | None` を使う
+- `except` 節で例外を再送出するときは `raise ... from err` または `raise ... from None` を使う
+- 値による分岐は `if-elif` チェーンではなく `match-case` 文を優先する
+- テーブル名は `validate_table_name()` で検証する（`^[a-z][a-z0-9_]{0,63}$`）
 
-Agent はアプリ起動時に 1 回だけ作成し、ID を state に保持する:
+## docstring・コメント規約
 
-```python
-# app/ai_service.py（起動時に 1 回）
-agent_id: str = client.beta.agents.create(
-    model="claude-opus-4-8",
-    system="...",  # 設計書の書式規約・mermaid 使用方針
-).id
-```
-
-AI ジョブ 1 件 = Session 1 件:
+- 公開関数には Google スタイルの docstring を付ける
+- 非公開関数（`_` プレフィックス）や自明なヘルパーは省略可
 
 ```python
-session = client.beta.agents.sessions.create(agent_id=agent_id)
-# events.send で依頼文を送信し、agent.message から markdown を抽出する
+def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
+    """AI にテーブル設計（TSV）を生成または更新させる。
+
+    Args:
+        prompt: ユーザーからの依頼テキスト。
+        current_tsv: 既存のカラム定義 TSV。指定時は更新モードで動作する。
+
+    Returns:
+        生成されたカラム定義の TSV 文字列。
+
+    Raises:
+        ValueError: OPENAI_API_KEY が未設定の場合。
+    """
 ```
 
-## 非同期 DB アクセス
+## エラーハンドリング規約
 
-SQLModel（SQLAlchemy 2.x async ラッパー）を使う。モデル定義と DB テーブルを 1 クラスで管理する:
+- ドメイン層・サービス層の失敗は、意味のあるエラー種別（例外クラスまたはエラーコード）で表現する
+- HTTP ハンドラは生の `error` 文字列に依存せず、例外の**型**からステータスコードとユーザー向けメッセージを決定する
+- 同じ種類の失敗は、ハンドラやレスポンス形式（HTML / JSON）にかかわらず同じメッセージを返す
+- 文字列マッチによるエラー判定は禁止
 
-```python
-from sqlmodel import SQLModel, Field
-from sqlmodel.ext.asyncio.session import AsyncSession
+## 静的アセット分離ルール
 
-class Document(SQLModel, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    title: str
-    ...
-```
+- `<script>` タグ内にコードを直接書かない → `static/js/*.js` に切り出す
+- `<style>` タグ内にスタイルを直接書かない → `static/css/*.css` に切り出す
+- `<svg>` タグをテンプレートに直接書かない → `static/icons/*.svg` に切り出す
+- テンプレートからは `<script src="/static/js/...">` や `<link rel="stylesheet" href="/static/css/...">` で参照
+- **例外**: hyperscript `_="..."` 属性、htmx `hx-*` 属性
 
-セッションは必ず `async with` で管理する:
+## UI インタラクション規約
 
-```python
-async with AsyncSession(engine) as session:
-    result = await session.exec(select(Document).where(Document.id == doc_id))
-    doc = result.one_or_none()
-```
+- クラス付け替え・表示/非表示・モーダル開閉・タブ切り替え → hyperscript 属性で記述
+- ページごとの ad-hoc な JavaScript を増やさない
+- JavaScript を書くべきケース: 複数コンポーネント間で状態を共有する複雑な挙動、API 呼び出しなどロジックに集中する処理
 
-`session.execute()` ではなく `session.exec()` を使う（SQLModel の推奨 API）。
+## AI 連携規約
 
-## EventBus の使い方
-
-`event_bus` は `asyncio.Queue` ベース。全処理がイベントループ内のため `call_soon_threadsafe` は不要:
-
-```python
-await event_bus.publish(f"job_finished:{job_id}")
-```
-
-watchdog 等のスレッドから呼ぶ場合のみ `loop.call_soon_threadsafe` を使う（本アプリでは不要）。
-
-## AI ジョブの非同期実行
-
-ジョブは `asyncio.create_task()` で実行する。Celery 等の外部キューは使わない:
-
-```python
-asyncio.create_task(run_ai_job(job_id))
-```
-
-## SSE フロントエンド（htmx-ext-sse）
-
-SSE の受信と DOM 更新は `htmx-ext-sse` 拡張で行う。
-htmx 本体の後に拡張スクリプトを読み込み、`hx-ext="sse"` を使う:
-
-```html
-<!-- 拡張読み込み -->
-<script src="..." defer></script>  <!-- htmx 本体 -->
-<script src="..." defer></script>  <!-- htmx-ext-sse -->
-
-<!-- SSE 接続と自動 swap -->
-<div hx-ext="sse" sse-connect="/events">
-  <div sse-swap="document_updated:{{doc_id}}" hx-target="#preview" hx-get="/documents/{{doc_id}}/preview">
-  </div>
-</div>
-```
-
-イベント名は `job_finished:{job_id}` / `job_failed:{job_id}` / `document_updated:{document_id}` の 3 種。
-サーバー側（sse-starlette）のイベント名と必ず一致させる。
-
-## SSE テスト
-
-`TestClient` は SSE 無限ストリームをハングさせるため、SSE エンドポイントのテストは
-ルート登録確認のみ行う:
-
-```python
-def test_events_route_is_registered():
-    from app.main import app
-    from fastapi.routing import APIRoute
-    paths = [r.path for r in app.routes if isinstance(r, APIRoute)]
-    assert "/events" in paths
-```
+- **OPENAI_API_KEY** 環境変数で OpenAI API に接続する
+- プロンプト定義は `prompts/ai_prompts.yaml` に外部化する（コード中にハードコードしない）
+- テストでは `SYSDEN_TEST_MODE=1` でスタブ応答を返し、実 API を呼ばない
+- 複数テーブル書き込みは途中失敗時にロールバックする（作成済みファイルを削除）
 
 ## テンプレートレスポンス
 
 Starlette 1.x 以降の API を使う:
 
 ```python
-# 正しい
 templates.TemplateResponse(request, "template.html", {"key": "value"})
-
-# 古い書き方（非推奨）
-templates.TemplateResponse("template.html", {"request": request, "key": "value"})
 ```
-
-## ロールバック実装
-
-ロールバックは `documents.current_revision_id` の付け替えのみ。履歴（revisions）は不変:
-
-```python
-doc.current_revision_id = target_revision_id
-await session.commit()
-```
-
-過去リビジョンを削除したり新たなリビジョンを作成したりしない。
