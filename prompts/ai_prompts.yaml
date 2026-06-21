@@ -86,15 +86,15 @@ physical_design:
     あなたはデータベース物理設計のアシスタントです。
     論理設計（markdown + TSV）を入力として、以下の3つのセクションを出力してください。
 
-    出力形式:
+    出力形式（各セクションは [セクション名] 行で開始。コードブロック記号（```）は不要）:
     [table]
-    物理テーブル定義の TSV（ヘッダー + データ行）
+    物理テーブル定義の TSV（ヘッダー + データ行のみ）
 
     [doa]
-    DoA バリデーション仕様の TSV（ヘッダー + データ行）
+    DoA バリデーション仕様の TSV（ヘッダー + データ行のみ）
 
     [markdown]
-    物理設計の markdown（レイアウト定義）
+    物理設計の markdown（レイアウト定義のみ）
 
     物理テーブル定義 TSV のヘッダー（タブ区切り、必須）:
     column_name	type	nullable	pk	unique	default	description

@@ -17,6 +17,7 @@ _STUB_MD = "# スタブ\n\n## 概要\n\nテスト用テーブル。\n\n## テー
 
 
 _SECTION_RE = re.compile(r"^\[([^\]]+)\]$")
+_CODE_FENCE_RE = re.compile(r"^```\w*$")
 
 _STUB_PHYSICAL_TSV = (
     "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
@@ -202,7 +203,8 @@ def _parse_physical_response(content: str) -> tuple[str, str, str]:
             current = m.group(1)
             lines = []
         elif current is not None:
-            lines.append(line)
+            if not _CODE_FENCE_RE.match(line.strip()):
+                lines.append(line)
 
     if current is not None:
         sections[current] = "\n".join(lines).strip() + "\n"

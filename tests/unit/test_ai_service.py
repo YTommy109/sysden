@@ -289,6 +289,39 @@ def test_parse_physical_response_正常系() -> None:
     assert "UUID" in doa
 
 
+def test_parse_physical_response_コードブロック記号を除去する() -> None:
+    # Given: セクション内容がバッククォートで囲まれたレスポンス
+    content = (
+        "[table]\n"
+        "```\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tuuid\tNO\tYES\tYES\tgen_random_uuid()\t主キー\n"
+        "```\n"
+        "\n"
+        "[doa]\n"
+        "```tsv\n"
+        "column_name\tpython_type\trequired\tmin\tmax\tmax_length\tdescription\n"
+        "id\tUUID\tYES\t\t\t\t\n"
+        "```\n"
+        "\n"
+        "[markdown]\n"
+        "```markdown\n"
+        "# 物理設計\n\n## テーブル定義\n\n![[physical_users.tsv]]\n"
+        "```\n"
+    )
+
+    # When: パースする
+    md, tsv, doa = ai_service._parse_physical_response(content)
+
+    # Then: バッククォートが除去されて正しくパースされる
+    assert "```" not in tsv
+    assert "```" not in doa
+    assert "```" not in md
+    assert "column_name" in tsv
+    assert "UUID" in doa
+    assert "physical_users.tsv" in md
+
+
 def test_parse_physical_response_セクション不足でエラー() -> None:
     # Given: doa セクションが欠けたレスポンス
     content = "[table]\ncolumn_name\ttype\nid\tuuid\n\n[markdown]\n# 物理設計\n"
