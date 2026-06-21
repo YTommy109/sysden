@@ -424,6 +424,120 @@ def test_create_multiple_tables_rolls_back_on_write_failure(
     assert not table_service.table_exists("orders")
 
 
+class TestHtmxHxRedirect:
+    """HX-Request ヘッダー付きリクエストで HX-Redirect が返る。"""
+
+    HX_HEADERS = {"HX-Request": "true"}
+
+    def test_create_table_returns_hx_redirect(self, client: TestClient, mock_openai: None) -> None:
+        # Given: AI モックが有効な状態
+
+        # When: HX-Request ヘッダー付きでテーブル作成する
+        resp = client.post(
+            "/api/tables",
+            data={"name": "users", "prompt": "テスト"},
+            headers=self.HX_HEADERS,
+            follow_redirects=False,
+        )
+
+        # Then: 200 + HX-Redirect ヘッダーが返る
+        assert resp.status_code == 200
+        assert "/tables/users" in resp.headers["HX-Redirect"]
+
+    def test_update_table_returns_hx_redirect(
+        self, client: TestClient, mock_openai: None, sample_tsv: str
+    ) -> None:
+        # Given: テーブルが存在する
+        from app import table_service
+
+        table_service.write_tsv("users", sample_tsv)
+
+        # When: HX-Request ヘッダー付きでテーブル更新する
+        resp = client.post(
+            "/api/tables/users",
+            data={"prompt": "カラムを追加"},
+            headers=self.HX_HEADERS,
+            follow_redirects=False,
+        )
+
+        # Then: 200 + HX-Redirect ヘッダーが返る
+        assert resp.status_code == 200
+        assert "/tables/users" in resp.headers["HX-Redirect"]
+
+    @pytest.mark.parametrize(
+        ("url", "target"),
+        [
+            ("/api/rebuild-index-tables", "#index-body"),
+            ("/api/rebuild-er-diagram", "#er-diagram"),
+        ],
+    )
+    def test_rebuild_returns_sse_fragment(self, client: TestClient, url: str, target: str) -> None:
+        # Given: アプリが起動している
+
+        # When: HX-Request ヘッダー付きでリビルドする
+        resp = client.post(url, headers=self.HX_HEADERS, follow_redirects=False)
+
+        # Then: SSE 接続用の HTML フラグメントが返る
+        assert resp.status_code == 200
+        body = resp.text
+        assert "sse-connect=" in body
+        assert f'hx-target="{target}"' in body
+        assert 'class="spinning"' in body
+        assert "disabled" in body
+
+
+class TestSseEndpoints:
+    """SSE エンドポイントの統合テスト。"""
+
+    @pytest.mark.parametrize(
+        "url",
+        ["/api/sse/rebuild-index", "/api/sse/rebuild-er"],
+    )
+    def test_sse_endpoint_returns_event_stream(self, client: TestClient, url: str) -> None:
+        # Given: アプリが起動している
+
+        # When: SSE エンドポイントに GET する
+        with client.stream("GET", url) as resp:
+            # Then: text/event-stream が返る
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.headers["content-type"]
+
+            # Then: complete イベントが含まれる
+            body = b"".join(resp.iter_bytes()).decode()
+            assert "event: complete" in body
+            assert "data: done" in body
+
+    @pytest.mark.parametrize(
+        ("url", "func_name"),
+        [
+            ("/api/sse/rebuild-index", "rebuild_index"),
+            ("/api/sse/rebuild-er", "rebuild_er_diagram_file"),
+        ],
+    )
+    def test_sse_endpoint_sends_event_even_on_error(
+        self,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+        url: str,
+        func_name: str,
+    ) -> None:
+        # Given: 対象関数が例外を投げる状態
+        from app import table_service
+
+        def _failing() -> None:
+            msg = "disk full"
+            raise OSError(msg)
+
+        monkeypatch.setattr(table_service, func_name, _failing)
+
+        # When: SSE エンドポイントに GET する
+        with client.stream("GET", url) as resp:
+            # Then: 例外が発生しても complete イベントが返る（回転を停止できる）
+            assert resp.status_code == 200
+            body = b"".join(resp.iter_bytes()).decode()
+            assert "event: complete" in body
+
+
 def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
     # Given: テーブルが存在するが index.tsv がない
     from app import table_service

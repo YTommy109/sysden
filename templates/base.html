@@ -8,8 +8,9 @@
 </head>
 <body>
   <nav><a href="/">sysden</a></nav>
-  <div class="container">{% block content %}{% endblock %}</div>
+  <div class="container" hx-ext="sse">{% block content %}{% endblock %}</div>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://unpkg.com/htmx-ext-sse@2/sse.js" defer></script>
   <script src="https://unpkg.com/hyperscript.org@0.9.14" defer></script>
   <script type="module" src="/static/js/mermaid-init.js"></script>
 </body>
