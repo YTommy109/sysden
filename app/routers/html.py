@@ -23,6 +23,8 @@ def index(request: Request) -> HTMLResponse:
 
 @router.get("/tables/{name}", response_class=HTMLResponse)
 def table_detail(name: str, request: Request) -> HTMLResponse:
+    if not table_service.validate_table_name(name):
+        raise HTTPException(status_code=422, detail=f"Invalid table name: '{name}'")
     try:
         rows = table_service.read_tsv(name)
     except FileNotFoundError as err:
