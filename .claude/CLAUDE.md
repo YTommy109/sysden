@@ -1,7 +1,7 @@
 # sysden
 
-markdown + mermaid で書かれたシステム設計ドキュメントを管理・閲覧する Web アプリ。
-ブラウザ上の依頼 UI から AI（Claude Agent SDK）に依頼してドキュメントを生成・更新する。
+テーブル設計ドキュメント（TSV + markdown + mermaid ER 図）を管理・閲覧する Web アプリ。
+ブラウザ上の依頼 UI から AI（OpenAI API）に依頼してテーブル定義を生成・更新する。
 人向けのテキストエディタは提供しない。
 
 ## アーキテクチャ
@@ -11,25 +11,22 @@ markdown + mermaid で書かれたシステム設計ドキュメントを管理�
   │
   └── FastAPI (uvicorn)
        ├── routers/html.py   — HTML ページ (Jinja2)
-       ├── routers/api.py    — JSON API
-       ├── routers/events.py — SSE (/events)
-       ├── ai_service        — Agent SDK セッション管理・リビジョン生成
-       ├── document_service  — ドキュメント CRUD
-       ├── event_bus         — asyncio.Queue ベースの SSE 通知
-       └── PostgreSQL (SQLAlchemy 2 async + asyncpg)
+       ├── routers/api.py    — JSON API + フォーム受付
+       ├── ai_service.py     — OpenAI Chat Completions でテーブル設計を生成
+       ├── table_service.py  — テーブル CRUD（TSV/markdown ファイル操作）
+       ├── config.py         — データディレクトリ設定
+       └── ファイルストレージ（.data/ 配下の TSV + markdown + mermaid）
 ```
 
-AI 生成は `asyncio.create_task()` で非同期実行し、完了を SSE でブラウザに通知する。
+AI 生成は同期的に実行し、レスポンスで結果をリダイレクトする。
 
 ## 技術スタック
 
 - Python 3.14+ / FastAPI + uvicorn（ASGI サーバー）
-- SQLModel（SQLAlchemy 2.x async ラッパー）+ asyncpg（PostgreSQL アクセス）
-- Anthropic SDK（Claude Agent SDK クライアント）
+- OpenAI SDK（テーブル設計の AI 生成）
 - markdown-it-py（markdown → HTML 変換）
-- sse-starlette（Server-Sent Events）
 - Jinja2（HTML テンプレート）
-- htmx + htmx-ext-sse + _hyperscript + mermaid.js（フロントエンド）
+- htmx + _hyperscript + mermaid.js（フロントエンド）
 - uv / taskipy（パッケージ管理・タスクランナー）
 
 ## コマンド
@@ -58,11 +55,9 @@ uv run task typecheck # ty 型チェック
 ## Python コーディング規約
 
 - 型アノテーションを必ず付ける（引数・戻り値）。`Optional[X]` ではなく `X | None` を使う
-- async 関数には `async def` を使う。DB アクセスはすべて await する
-- DB セッションは `async with AsyncSession(engine) as session:` パターンで使う（SQLModel の `AsyncSession` を利用）
-- `event_bus` は `asyncio.Queue` ベース。全処理がイベントループ内のため `call_soon_threadsafe` は不要
 - `except` 節で例外を再送出するときは `raise ... from err` または `raise ... from None` を使う
 - 値による分岐は `if-elif` チェーンではなく `match-case` 文を優先する
+- テーブル名は `validate_table_name()` で検証する（`^[a-z][a-z0-9_]{0,63}$`）
 
 ## docstring・コメント規約
 
@@ -145,29 +140,18 @@ def test_create_table_via_ai(client: TestClient, mock_openai: None) -> None:
 
 ## AI 連携規約
 
-- **ANTHROPIC_API_KEY は設定しない**。Agent SDK はサブスクリプション認証で動作する。
-  シェルに `ANTHROPIC_API_KEY` が設定されていると SDK がそちらを優先し Max プランの枠外で課金される
-- Agent（設計書生成の指示・モデル ID）はアプリ起動時に 1 回だけ作成し、ID を state に保持する
-- AI ジョブ 1 件 = Session 1 件。セッション完了後に `agent.message` から markdown を抽出する
-- 失敗時は `status=failed` と `error` を記録。リビジョンは作成せず現行ドキュメントは無傷で残す
+- **OPENAI_API_KEY** 環境変数で OpenAI API に接続する
+- プロンプト定義は `prompts/ai_prompts.yaml` に外部化する（コード中にハードコードしない）
+- テストでは `SYSDEN_TEST_MODE=1` でスタブ応答を返し、実 API を呼ばない
+- 複数テーブル書き込みは途中失敗時にロールバックする（作成済みファイルを削除）
 
 ## テスト規約
 
 - **ユニットテスト**: `tests/unit/` — pytest AAA スタイル、外部依存なし
-  - ai_service のテストでは Agent SDK をモックする
-- **インテグレーションテスト**: `tests/integration/` — FastAPI `TestClient` + テスト用 PostgreSQL
+  - ai_service のテストでは OpenAI SDK をモック（`monkeypatch` + スタブクライアント）する
+- **インテグレーションテスト**: `tests/integration/` — FastAPI `TestClient` + 一時データディレクトリ
 - **E2E テスト**: `tests/e2e/` — Playwright（下記 E2E 規約を参照）
-- SSE エンドポイントのテストは `TestClient` の制限からルート登録確認のみ行う
 - `uv run pytest tests/unit -q` は 60 秒以内に完了すること
-
-```python
-# SSE ルート登録確認の例
-def test_events_route_is_registered():
-    from app.main import app
-    from fastapi.routing import APIRoute
-    paths = [r.path for r in app.routes if isinstance(r, APIRoute)]
-    assert "/events" in paths
-```
 
 ## E2E テスト規約
 
