@@ -484,6 +484,31 @@ def test_tables_to_er_diagram_description_table_reference() -> None:
     assert "||--o{" in result
 
 
+def test_tables_to_er_diagram_description_via_display_name() -> None:
+    # Arrange — description に日本語表示名「商品種類テーブル」と記述、
+    #           ファイル名は英語 product_types
+    product_types_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    )
+    products_tsv = (
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "種類識別子\tUUID\tNO\tNO\tNO\t\t商品種類テーブルの識別子を参照\n"
+    )
+    table_service.write_tsv("product_types", product_types_tsv)
+    table_service.write_markdown("product_types", "# 商品種類\n\n![[product_types.tsv]]")
+    table_service.write_tsv("products", products_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert — 表示名経由で product_types → products のリレーションが検出される
+    assert "product_types" in result
+    assert "products" in result
+    assert "||--o{" in result
+
+
 def test_tables_to_er_diagram_description_no_matching_table() -> None:
     # Arrange — description に「注文テーブル」と書いてあるが注文テーブルは存在しない
     products_tsv = (
@@ -581,8 +606,10 @@ def test_read_index_tables(sample_tsv: str) -> None:
     # Act
     result = table_service.read_index_tables()
 
-    # Assert — ソート済みのテーブル名リスト
-    assert result == ["orders", "users"]
+    # Assert — name と display_name を含む辞書のリスト
+    assert len(result) == 2
+    assert result[0]["name"] == "orders"
+    assert result[1]["name"] == "users"
 
 
 def test_read_index_tables_empty() -> None:
@@ -654,7 +681,8 @@ def test_rebuild_index_tables_creates_tsv(sample_tsv: str) -> None:
     d = get_data_dir()
     assert (d / "index.tsv").exists()
     assert not (d / "index.mmd").exists()
-    assert table_service.read_index_tables() == ["orders", "users"]
+    names = [t["name"] for t in table_service.read_index_tables()]
+    assert names == ["orders", "users"]
 
 
 def test_rebuild_index_tables_empty() -> None:
@@ -701,3 +729,170 @@ def test_rebuild_er_diagram_file_empty() -> None:
     d = get_data_dir()
     assert (d / "index.mmd").exists()
     assert table_service.read_er_diagram() == ""
+
+
+def test_write_and_read_markdown() -> None:
+    # Arrange
+    content = "# users\n\nユーザー管理テーブル。\n\n![[users.tsv]]"
+
+    # Act
+    table_service.write_markdown("users", content)
+    result = table_service.read_markdown("users")
+
+    # Assert
+    assert result == content
+
+
+def test_read_markdown_not_found() -> None:
+    # Arrange — markdown が存在しない
+
+    # Act
+    result = table_service.read_markdown("nonexistent")
+
+    # Assert
+    assert result is None
+
+
+def test_render_markdown_with_embeds(sample_tsv: str) -> None:
+    # Arrange — TSV を書き込み、埋め込みリンクを含む markdown を用意
+    table_service.write_tsv("users", sample_tsv)
+    content = "# users\n\n説明文。\n\n![[users.tsv]]"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — ![[users.tsv]] が markdown テーブルに展開される
+    assert "![[users.tsv]]" not in result
+    assert "| カラム名 |" in result
+    assert "| **id** |" in result
+
+
+def test_render_markdown_with_embeds_no_embed() -> None:
+    # Arrange — 埋め込みリンクがない markdown
+    content = "# users\n\n説明文のみ。"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — そのまま返る
+    assert result == content
+
+
+def test_render_markdown_with_embeds_missing_tsv() -> None:
+    # Arrange — 参照先の TSV が存在しない
+    content = "# missing\n\n![[missing.tsv]]"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — 埋め込みはプレースホルダになる
+    assert "![[missing.tsv]]" not in result
+    assert "missing.tsv" in result
+
+
+def test_render_markdown_with_embeds_ignores_path_traversal() -> None:
+    # Arrange — パストラバーサルを含む埋め込みリンク
+    content = "# test\n\n![[../../etc/passwd.tsv]]"
+
+    # Act
+    result = table_service.render_markdown_with_embeds(content)
+
+    # Assert — パストラバーサルは展開されない（そのまま残る）
+    assert "![[../../etc/passwd.tsv]]" in result
+
+
+def test_delete_table_also_deletes_markdown(sample_tsv: str) -> None:
+    # Arrange — TSV と markdown の両方を作成
+    table_service.write_tsv("orders", sample_tsv)
+    table_service.write_markdown("orders", "# orders\n\n![[orders.tsv]]")
+
+    # Act
+    table_service.delete_table("orders")
+
+    # Assert — TSV も markdown も削除される
+    assert not table_service.table_exists("orders")
+    assert table_service.read_markdown("orders") is None
+
+
+def test_read_table_display_name_from_markdown() -> None:
+    # Arrange — h1 日本語見出しを持つ markdown
+    table_service.write_markdown(
+        "products", "# プロダクト\n\n## 概要\n\n説明。\n\n![[products.tsv]]"
+    )
+
+    # Act
+    result = table_service.read_table_display_name("products")
+
+    # Assert
+    assert result == "プロダクト"
+
+
+def test_read_table_display_name_no_markdown() -> None:
+    # Arrange — markdown がない
+
+    # Act
+    result = table_service.read_table_display_name("missing")
+
+    # Assert — ファイル名をそのまま返す
+    assert result == "missing"
+
+
+def test_read_table_display_name_no_heading() -> None:
+    # Arrange — h1 見出しがない markdown
+    table_service.write_markdown("notes", "## 概要\n\n本文のみ。")
+
+    # Act
+    result = table_service.read_table_display_name("notes")
+
+    # Assert — ファイル名をそのまま返す
+    assert result == "notes"
+
+
+def test_strip_title_heading() -> None:
+    # Arrange
+    content = "# プロダクト\n\n## 概要\n\n説明文。"
+
+    # Act
+    result = table_service.strip_title_heading(content)
+
+    # Assert — h1 が除去され、概要セクションから始まる
+    assert "# プロダクト" not in result
+    assert result.startswith("## 概要")
+
+
+def test_strip_title_heading_no_h1() -> None:
+    # Arrange — h1 がない場合はそのまま返る
+    content = "## 概要\n\n説明文。"
+
+    # Act
+    result = table_service.strip_title_heading(content)
+
+    # Assert
+    assert result == content
+
+
+def test_rebuild_index_tables_includes_display_name(sample_tsv: str) -> None:
+    # Arrange — markdown 付きテーブルを作成
+    table_service.write_tsv("products", sample_tsv)
+    table_service.write_markdown("products", "# プロダクト\n\n## 概要\n\n![[products.tsv]]")
+
+    # Act
+    table_service.rebuild_index_tables()
+
+    # Assert — display_name が日本語になる
+    tables = table_service.read_index_tables()
+    assert tables[0]["name"] == "products"
+    assert tables[0]["display_name"] == "プロダクト"
+
+
+def test_rebuild_index_tables_fallback_display_name(sample_tsv: str) -> None:
+    # Arrange — markdown なしのテーブル
+    table_service.write_tsv("users", sample_tsv)
+
+    # Act
+    table_service.rebuild_index_tables()
+
+    # Assert — display_name はファイル名と同じ
+    tables = table_service.read_index_tables()
+    assert tables[0]["name"] == "users"
+    assert tables[0]["display_name"] == "users"

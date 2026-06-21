@@ -22,8 +22,8 @@ class TestEndToEndFlow:
         page.wait_for_url("**/tables/*")
         table_name = page.locator("h1").inner_text()
 
-        # When: 一覧に戻る
-        page.click('a[href="/"]:has-text("一覧に戻る")')
+        # When: 戻るアイコンで一覧に戻る
+        page.click('a[href="/"][aria-label="一覧に戻る"]')
         page.wait_for_url(f"{base_url}/")
 
         # Then: 作成したテーブルの行が表示される

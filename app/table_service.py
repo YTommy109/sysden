@@ -70,7 +70,7 @@ def write_tsv(name: str, tsv_content: str) -> None:
 
 
 def delete_table(name: str) -> None:
-    """テーブルの TSV ファイルを削除する。
+    """テーブルの TSV ファイルと markdown ファイルを削除する。
 
     Args:
         name: テーブル名。
@@ -82,6 +82,99 @@ def delete_table(name: str) -> None:
     if not path.exists():
         raise FileNotFoundError(f"Table '{name}' not found")
     path.unlink()
+    md_path = get_data_dir() / f"{name}.md"
+    if md_path.exists():
+        md_path.unlink()
+
+
+def write_markdown(name: str, content: str) -> None:
+    """テーブル説明の markdown をファイルに書き込む。
+
+    Args:
+        name: テーブル名。
+        content: markdown 文字列。
+    """
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{name}.md"
+    path.write_text(content.strip() + "\n", encoding="utf-8")
+
+
+def read_markdown(name: str) -> str | None:
+    """テーブル説明の markdown を読み込む。
+
+    Args:
+        name: テーブル名。
+
+    Returns:
+        markdown 文字列。ファイルが存在しなければ None。
+    """
+    path = get_data_dir() / f"{name}.md"
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8").strip()
+
+
+_HEADING_RE = re.compile(r"^# (.+)$", re.MULTILINE)
+_TITLE_LINE_RE = re.compile(r"^# [^\n]+\n*")
+
+
+def read_table_display_name(name: str) -> str:
+    """テーブルの表示名を markdown の見出しから取得する。
+
+    Args:
+        name: テーブルのファイル名（拡張子なし）。
+
+    Returns:
+        markdown の最初の # 見出しから取得した表示名。
+        markdown がない場合や見出しがない場合はファイル名をそのまま返す。
+    """
+    md = read_markdown(name)
+    if md is None:
+        return name
+    m = _HEADING_RE.search(md)
+    if m:
+        return m.group(1).strip()
+    return name
+
+
+def strip_title_heading(content: str) -> str:
+    """markdown から最初の # 見出し行を除去する。
+
+    テンプレートの h1 と重複するため、レンダリング前に呼び出す。
+
+    Args:
+        content: markdown 文字列。
+
+    Returns:
+        # 見出しが除去された markdown 文字列。
+    """
+    return _TITLE_LINE_RE.sub("", content, count=1)
+
+
+_EMBED_RE = re.compile(r"!\[\[([A-Za-z0-9_]+\.tsv)\]\]")
+
+
+def render_markdown_with_embeds(content: str) -> str:
+    """markdown 内の ![[*.tsv]] を TSV テーブルの markdown 表現に展開する。
+
+    Args:
+        content: 埋め込みリンクを含む markdown 文字列。
+
+    Returns:
+        埋め込みが展開された markdown 文字列。
+    """
+
+    def _replace(m: re.Match[str]) -> str:
+        filename = m.group(1)
+        name = filename.removesuffix(".tsv")
+        try:
+            rows = read_tsv(name)
+        except FileNotFoundError:
+            return f"_（{filename} が見つかりません）_"
+        return tsv_to_markdown(rows)
+
+    return _EMBED_RE.sub(_replace, content)
 
 
 _DISPLAY_HEADERS = ["カラム名", "型", "ユニーク", "説明"]
@@ -134,6 +227,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
         return "_（カラム定義なし）_"
 
     table_names = set(list_tables())
+    dn_map = _build_display_name_map(table_names)
 
     sep = ["---"] * len(_DISPLAY_HEADERS)
     lines = [
@@ -144,7 +238,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
         col_name = row.get("column_name", "")
         description = row.get("description", "")
 
-        is_fk = _resolve_fk_target(col_name, table_names, description) is not None
+        is_fk = _resolve_fk_target(col_name, table_names, description, dn_map) is not None
         is_pk = row.get("pk", "").upper() == "YES"
 
         if is_pk:
@@ -184,7 +278,10 @@ def rebuild_index_tables() -> None:
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     names = list_tables()
-    lines = ["name"] + names
+    lines = ["name\tdisplay_name"]
+    for name in names:
+        display_name = read_table_display_name(name)
+        lines.append(f"{name}\t{display_name}")
     (d / f"{_INDEX_STEM}.tsv").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -205,18 +302,21 @@ def rebuild_index() -> None:
     rebuild_er_diagram_file()
 
 
-def read_index_tables() -> list[str]:
+def read_index_tables() -> list[dict[str, str]]:
     """index.tsv からテーブル名一覧を読み込む。
 
     Returns:
-        テーブル名のリスト。ファイルが存在しなければ空リスト。
+        name と display_name を含む辞書のリスト。ファイルが存在しなければ空リスト。
     """
     path = get_data_dir() / f"{_INDEX_STEM}.tsv"
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
-        return [row["name"] for row in reader]
+        return [
+            {"name": row["name"], "display_name": row.get("display_name", row["name"])}
+            for row in reader
+        ]
 
 
 def read_er_diagram() -> str:
@@ -232,25 +332,37 @@ def read_er_diagram() -> str:
     return content
 
 
+def _build_display_name_map(table_names: set[str]) -> dict[str, str]:
+    """表示名からファイル名への逆引きマップを構築する。"""
+    mapping: dict[str, str] = {}
+    for name in table_names:
+        display = read_table_display_name(name)
+        if display != name:
+            mapping[display] = name
+    return mapping
+
+
 def _resolve_fk_target(
     column_name: str,
     table_names: set[str],
     description: str = "",
+    display_name_map: dict[str, str] | None = None,
 ) -> str | None:
     """カラム名または description から参照先テーブルを推定する。
 
     以下の順で判定し、最初にヒットしたテーブル名を返す:
 
     1. ``_id`` サフィックス（例: ``user_id`` → ``user`` / ``users``）
-    2. description 中の「〇〇テーブル」表記（例: 「商品種類テーブルの識別子」→ ``商品種類``）
+    2. description 中の「〇〇テーブル」表記（例: 「商品種類テーブルの識別子」→ ``product_types``）
 
     Args:
         column_name: カラム名（例: ``user_id``、``種類識別子``）。
-        table_names: 存在するテーブル名のセット。
+        table_names: 存在するテーブル名（ファイル名）のセット。
         description: カラムの説明文。
+        display_name_map: 表示名→ファイル名の逆引きマップ。
 
     Returns:
-        一致したテーブル名。見つからなければ ``None``。
+        一致したテーブル名（ファイル名）。見つからなければ ``None``。
     """
     if column_name.endswith("_id"):
         prefix = column_name[: -len("_id")]
@@ -263,6 +375,8 @@ def _resolve_fk_target(
         ref = match.group(1)
         if ref in table_names:
             return ref
+        if display_name_map and ref in display_name_map:
+            return display_name_map[ref]
 
     return None
 
@@ -280,6 +394,7 @@ def tables_to_er_diagram() -> str:
         return ""
 
     name_set = set(names)
+    dn_map = _build_display_name_map(name_set)
     lines = ["erDiagram"]
     relations: list[str] = []
 
@@ -293,6 +408,7 @@ def tables_to_er_diagram() -> str:
                 row.get("column_name", ""),
                 name_set,
                 row.get("description", ""),
+                dn_map,
             )
             if target is None or target == name:
                 continue

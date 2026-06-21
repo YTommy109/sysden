@@ -8,16 +8,43 @@ MULTI_TABLE_RESPONSE = (
     "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
     "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
     "\n"
+    "[users.md]\n"
+    "# users テーブル\n"
+    "\n"
+    "ユーザー情報を管理する。\n"
+    "\n"
+    "## テーブル設計\n"
+    "\n"
+    "![[users.tsv]]\n"
+    "\n"
     "[orders]\n"
     "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
     "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
     "user_id\tUUID\tNO\tNO\tNO\t\t注文者\n"
+    "\n"
+    "[orders.md]\n"
+    "# orders テーブル\n"
+    "\n"
+    "注文情報を管理する。\n"
+    "\n"
+    "## テーブル設計\n"
+    "\n"
+    "![[orders.tsv]]\n"
 )
 
 SINGLE_TABLE_RESPONSE = (
     "[users]\n"
     "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
     "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "\n"
+    "[users.md]\n"
+    "# users テーブル\n"
+    "\n"
+    "ユーザー情報を管理する。\n"
+    "\n"
+    "## テーブル設計\n"
+    "\n"
+    "![[users.tsv]]\n"
 )
 
 
@@ -72,9 +99,10 @@ def test_create_table_design_single_table(monkeypatch: pytest.MonkeyPatch) -> No
 
     # Assert
     assert len(tables) == 1
-    name, tsv = tables[0]
+    name, tsv, md = tables[0]
     assert name == "users"
     assert "column_name" in tsv
+    assert "![[users.tsv]]" in md
 
 
 def test_create_table_design_multiple_tables(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,6 +118,7 @@ def test_create_table_design_multiple_tables(monkeypatch: pytest.MonkeyPatch) ->
     assert tables[0][0] == "users"
     assert tables[1][0] == "orders"
     assert "user_id" in tables[1][1]
+    assert "![[orders.tsv]]" in tables[1][2]
 
 
 def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -101,10 +130,11 @@ def test_create_table_design_test_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Assert
     assert len(tables) == 1
-    name, tsv = tables[0]
+    name, tsv, md = tables[0]
     assert isinstance(name, str)
     assert len(name) > 0
     assert "column_name" in tsv
+    assert f"![[{name}.tsv]]" in md
 
 
 class TestParseMultiTableResponse:
@@ -116,8 +146,10 @@ class TestParseMultiTableResponse:
 
         # Assert
         assert len(result) == 1
-        assert result[0][0] == "users"
-        assert "id\tUUID" in result[0][1]
+        name, tsv, md = result[0]
+        assert name == "users"
+        assert "id\tUUID" in tsv
+        assert "![[users.tsv]]" in md
 
     def test_multiple_tables(self) -> None:
         # Act
@@ -127,10 +159,14 @@ class TestParseMultiTableResponse:
         assert len(result) == 2
         assert result[0][0] == "users"
         assert result[1][0] == "orders"
+        assert "![[users.tsv]]" in result[0][2]
+        assert "![[orders.tsv]]" in result[1][2]
 
     def test_strips_whitespace(self) -> None:
         # Arrange
-        text = "\n\n[users]\ncolumn_name\ttype\nid\tUUID\n\n\n"
+        text = (
+            "\n\n[users]\ncolumn_name\ttype\nid\tUUID\n\n[users.md]\n# users\n\n![[users.tsv]]\n\n"
+        )
 
         # Act
         result = ai_service._parse_multi_table_response(text)
