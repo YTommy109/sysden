@@ -321,12 +321,11 @@ class TestRebuildButtons:
         page.goto(base_url)
         expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
 
-        # When: "テーブル一覧の再作成" ボタンをクリックする
+        # When: "テーブル一覧の再作成" ボタンをクリックする（SSE で非同期更新）
         page.locator('button[aria-label="テーブル一覧の再作成"]').click()
-        page.wait_for_url("**/")
 
         # Then: テーブル行が表示される
-        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
+        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
 
     def test_rebuild_index_tables_also_restores_er_diagram(
         self, page: Page, base_url: str, e2e_data_dir: Path
@@ -340,12 +339,11 @@ class TestRebuildButtons:
         page.goto(base_url)
         expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
-        # When: "テーブル一覧の再作成" ボタンをクリックする
+        # When: "テーブル一覧の再作成" ボタンをクリックする（SSE で非同期更新）
         page.locator('button[aria-label="テーブル一覧の再作成"]').click()
-        page.wait_for_url("**/")
 
         # Then: ER 図も再作成されて表示される
-        expect(page.locator("#er-diagram .mermaid")).to_be_visible()
+        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
 
     def test_rebuild_er_diagram_restores_diagram(
         self, page: Page, base_url: str, e2e_data_dir: Path
@@ -359,12 +357,119 @@ class TestRebuildButtons:
         page.goto(base_url)
         expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
 
-        # When: "ER 図の再作成" ボタンをクリックする
+        # When: "ER 図の再作成" ボタンをクリックする（SSE で非同期更新）
         page.locator('button[aria-label="ER 図の再作成"]').click()
-        page.wait_for_url("**/")
 
         # Then: ER 図が表示される
-        expect(page.locator("#er-diagram .mermaid")).to_be_visible()
+        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
+
+
+class TestButtonEffects:
+    """ボタンの非活性化と回転アニメーション。"""
+
+    def test_create_submit_button_disables_during_request(self, page: Page, base_url: str) -> None:
+        # Given: ダイアログを開いて依頼文を入力した状態
+        page.goto(base_url)
+        page.locator('button:has-text("テーブル追加")').click()
+        page.fill('#create-dialog textarea[name="prompt"]', "ユーザーテーブル")
+
+        # When: 送信ボタンをクリックする
+        submit_btn = page.locator('#create-dialog button[type="submit"]')
+        submit_btn.click()
+
+        # Then: ボタンが disabled になる（二重送信防止）
+        expect(submit_btn).to_be_disabled()
+
+        # Cleanup: ページ遷移を待つ
+        page.wait_for_url("**/tables/*")
+
+    def test_rebuild_index_button_shows_spinning_and_disables(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在する
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+
+        # When: "テーブル一覧の再作成" ボタンをクリックする
+        btn = page.locator('button[aria-label="テーブル一覧の再作成"]')
+        btn.click()
+
+        # Then: disabled + spinning な SSE フラグメントに置き換わる
+        spinning_img = page.locator("[sse-connect] img.spinning")
+        expect(spinning_img).to_be_visible()
+        disabled_btn = page.locator("[sse-connect] button[disabled]")
+        expect(disabled_btn).to_be_visible()
+
+        # Then: SSE 完了後にテーブル一覧が復元される
+        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
+
+    def test_rebuild_er_button_shows_spinning_and_disables(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在する
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+
+        # When: "ER 図の再作成" ボタンをクリックする
+        btn = page.locator('button[aria-label="ER 図の再作成"]')
+        btn.click()
+
+        # Then: disabled + spinning な SSE フラグメントに置き換わる
+        spinning_img = page.locator("[sse-connect] img.spinning")
+        expect(spinning_img).to_be_visible()
+        disabled_btn = page.locator("[sse-connect] button[disabled]")
+        expect(disabled_btn).to_be_visible()
+
+        # Then: SSE 完了後に ER 図が復元される
+        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
+
+    def test_rebuild_button_restores_after_completion(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在する
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+
+        # When: "テーブル一覧の再作成" ボタンをクリックして完了を待つ
+        page.locator('button[aria-label="テーブル一覧の再作成"]').click()
+        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
+
+        # Then: 再作成ボタンが元の状態（有効・回転なし）に戻る
+        btn = page.locator('button[aria-label="テーブル一覧の再作成"]')
+        expect(btn).to_be_enabled()
+        expect(btn.locator("img.spinning")).not_to_be_visible()
+
+    def test_rebuild_er_button_restores_after_completion(
+        self, page: Page, base_url: str, e2e_data_dir: Path
+    ) -> None:
+        # Given: テーブル TSV が存在する
+        tsv = (
+            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        )
+        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
+        page.goto(base_url)
+
+        # When: "ER 図の再作成" ボタンをクリックして完了を待つ
+        page.locator('button[aria-label="ER 図の再作成"]').click()
+        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
+
+        # Then: 再作成ボタンが元の状態（有効・回転なし）に戻る
+        btn = page.locator('button[aria-label="ER 図の再作成"]')
+        expect(btn).to_be_enabled()
+        expect(btn.locator("img.spinning")).not_to_be_visible()
 
 
 class TestDeleteTable:

@@ -146,6 +146,24 @@ class TestTableDetailUpdate:
         # Then: テーブルが表示される
         expect(page.locator("#table-view table")).to_be_visible()
 
+    def test_update_submit_button_disables_during_request(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: テーブル "users" が存在し詳細ページを表示中
+        create_table("users")
+        page.goto(f"{base_url}/tables/users")
+
+        # When: 更新フォームに入力して送信する
+        page.fill('textarea[name="prompt"]', "email カラムを追加して")
+        submit_btn = page.locator('button[type="submit"]')
+        submit_btn.click()
+
+        # Then: 送信ボタンが disabled になる（二重送信防止）
+        expect(submit_btn).to_be_disabled()
+
+        # Cleanup: ページ遷移を待つ
+        page.wait_for_url("**/tables/users")
+
 
 class TestTableDetailNavigation:
     """テーブル詳細ページからのナビゲーション。"""
