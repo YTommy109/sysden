@@ -544,6 +544,67 @@ class TestSseEndpoints:
             assert "event: complete" in body
 
 
+def test_物理設計を生成する(
+    client: TestClient,
+    mock_openai: None,
+    sample_tsv: str,
+) -> None:
+    # Given: 論理設計のテーブルが存在する
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown(
+        "users",
+        "# ユーザー\n\n## 概要\n\nユーザー管理。\n\n## テーブル設計\n\n![[users.tsv]]",
+    )
+
+    # When: 物理設計生成 API にリクエストを送る
+    resp = client.post("/api/tables/users/physical", follow_redirects=False)
+
+    # Then: 物理設計ページにリダイレクトされる
+    assert resp.status_code == 303
+    assert "/tables/users/physical" in resp.headers["location"]
+
+    # Then: 物理設計ファイルが作成される
+    assert table_service.physical_design_exists("users")
+
+
+def test_論理設計が存在しないテーブルの物理設計生成は404(
+    client: TestClient,
+    mock_openai: None,
+) -> None:
+    # Given: テーブルが存在しない
+
+    # When: 物理設計生成 API にリクエストを送る
+    resp = client.post("/api/tables/nonexistent/physical")
+
+    # Then: 404 が返る
+    assert resp.status_code == 404
+
+
+def test_物理設計生成でHXリダイレクトを返す(
+    client: TestClient,
+    mock_openai: None,
+    sample_tsv: str,
+) -> None:
+    # Given: テーブルが存在する
+    from app import table_service
+
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
+
+    # When: HX-Request ヘッダー付きで物理設計を生成する
+    resp = client.post(
+        "/api/tables/users/physical",
+        headers={"HX-Request": "true"},
+        follow_redirects=False,
+    )
+
+    # Then: 200 + HX-Redirect ヘッダーが返る
+    assert resp.status_code == 200
+    assert "/tables/users/physical" in resp.headers["HX-Redirect"]
+
+
 def test_テーブル一覧を再作成する(client: TestClient, sample_tsv: str) -> None:
     # Given: テーブルが存在するが index.tsv がない
     from app import table_service
