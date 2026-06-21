@@ -113,6 +113,14 @@ def delete_table(name: str) -> None:
     md_path = get_data_dir() / f"{name}.md"
     if md_path.exists():
         md_path.unlink()
+    for suffix in (
+        f"{_PHYSICAL_PREFIX}{name}.tsv",
+        f"{_PHYSICAL_PREFIX}{name}_doa.tsv",
+        f"{_PHYSICAL_PREFIX}{name}.md",
+    ):
+        p = get_data_dir() / suffix
+        if p.exists():
+            p.unlink()
     logger.info("テーブル削除: table=%s", name)
 
 
