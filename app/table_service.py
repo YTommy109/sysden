@@ -26,6 +26,9 @@ def validate_table_name(name: str) -> bool:
     return _TABLE_NAME_RE.fullmatch(name) is not None
 
 
+_PHYSICAL_PREFIX = "physical_"
+
+
 def list_tables() -> list[str]:
     """データディレクトリに存在するテーブル名の一覧を返す。
 
@@ -34,7 +37,11 @@ def list_tables() -> list[str]:
     """
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
-    return sorted(f.stem for f in d.glob("*.tsv") if f.stem != _INDEX_STEM)
+    return sorted(
+        f.stem
+        for f in d.glob("*.tsv")
+        if f.stem != _INDEX_STEM and not f.stem.startswith(_PHYSICAL_PREFIX)
+    )
 
 
 def read_tsv_raw(name: str) -> str:
@@ -106,6 +113,14 @@ def delete_table(name: str) -> None:
     md_path = get_data_dir() / f"{name}.md"
     if md_path.exists():
         md_path.unlink()
+    for suffix in (
+        f"{_PHYSICAL_PREFIX}{name}.tsv",
+        f"{_PHYSICAL_PREFIX}{name}_doa.tsv",
+        f"{_PHYSICAL_PREFIX}{name}.md",
+    ):
+        p = get_data_dir() / suffix
+        if p.exists():
+            p.unlink()
     logger.info("テーブル削除: table=%s", name)
 
 
@@ -230,7 +245,21 @@ def _translate_type(raw_type: str) -> str:
 
 def _build_description(row: dict[str, str]) -> str:
     """description を説明セルとして返す。"""
-    return row.get("description", "")
+    return row.get("description") or ""
+
+
+def _tsv_to_generic_markdown(rows: list[dict[str, str]]) -> str:
+    """任意ヘッダーの TSV を汎用 Markdown テーブルとして変換する。"""
+    headers = [h for h in rows[0] if h is not None]
+    sep = ["---"] * len(headers)
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(sep) + " |",
+    ]
+    for row in rows:
+        cells = [str(row.get(h) or "") for h in headers]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
 
 
 def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
@@ -239,6 +268,7 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     TSV の 7 列（column_name, type, nullable, pk, unique, default, description）を
     表示用の 4 列（カラム名, 型, ユニーク, 説明）にマッピングする。
     型名は日本語に変換し、必須は * プレフィックス、PK は太字、FK は薄色で表現する。
+    論理設計列（type）を持たない TSV は汎用テーブルとして出力する。
 
     Args:
         rows: カラム定義の辞書リスト。空の場合はプレースホルダを返す。
@@ -248,6 +278,9 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     """
     if not rows:
         return "_（カラム定義なし）_"
+
+    if "type" not in rows[0]:
+        return _tsv_to_generic_markdown(rows)
 
     table_names = set(list_tables())
     dn_map = _build_display_name_map(table_names)
@@ -294,6 +327,38 @@ def table_exists(name: str) -> bool:
         存在すれば True。
     """
     return (get_data_dir() / f"{name}.tsv").exists()
+
+
+def physical_design_exists(name: str) -> bool:
+    return (get_data_dir() / f"{_PHYSICAL_PREFIX}{name}.tsv").exists()
+
+
+def write_physical_tsv(name: str, tsv_content: str) -> None:
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{_PHYSICAL_PREFIX}{name}.tsv"
+    path.write_text(tsv_content.strip() + "\n", encoding="utf-8")
+
+
+def write_physical_doa_tsv(name: str, tsv_content: str) -> None:
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{_PHYSICAL_PREFIX}{name}_doa.tsv"
+    path.write_text(tsv_content.strip() + "\n", encoding="utf-8")
+
+
+def write_physical_markdown(name: str, content: str) -> None:
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{_PHYSICAL_PREFIX}{name}.md"
+    path.write_text(content.strip() + "\n", encoding="utf-8")
+
+
+def read_physical_markdown(name: str) -> str | None:
+    path = get_data_dir() / f"{_PHYSICAL_PREFIX}{name}.md"
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8").strip()
 
 
 def rebuild_index_tables() -> None:
@@ -394,7 +459,7 @@ def _resolve_fk_target(
             if candidate in table_names:
                 return candidate
 
-    match = re.search(r"(.+?)テーブル", description)
+    match = re.search(r"(.+?)テーブル", description or "")
     if match:
         ref = match.group(1)
         if ref in table_names:

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 
 from app import ai_service, table_service
+from app.config import get_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,41 @@ def rebuild_er_diagram(request: Request) -> Response:
         return _rebuilding_response("/api/sse/rebuild-er", "#er-diagram", "ER 図の再作成")
     table_service.rebuild_er_diagram_file()
     return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/tables/{name}/physical")
+def generate_physical(name: str, request: Request) -> Response:
+    """論理設計から物理設計を AI に生成させる。"""
+    logger.info("物理設計生成リクエスト: table=%s", name)
+    _check_table_name(name)
+    try:
+        logical_tsv = table_service.read_tsv_raw(name)
+    except FileNotFoundError as err:
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
+
+    logical_md = table_service.read_markdown(name) or ""
+
+    common_rules: str | None = None
+    index_md_path = get_data_dir() / "index.md"
+    if index_md_path.exists():
+        common_rules = index_md_path.read_text(encoding="utf-8")
+
+    physical_md, physical_tsv, physical_doa = ai_service.generate_physical_design(
+        name=name,
+        logical_md=logical_md,
+        logical_tsv=logical_tsv,
+        common_rules=common_rules,
+    )
+
+    table_service.write_physical_tsv(name, physical_tsv)
+    table_service.write_physical_doa_tsv(name, physical_doa)
+    table_service.write_physical_markdown(name, physical_md)
+
+    logger.info("物理設計生成完了: table=%s", name)
+    redirect_url = f"/tables/{name}/physical"
+    if request.headers.get("HX-Request"):
+        return Response(headers={"HX-Redirect": redirect_url})
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.delete("/tables/{name}")

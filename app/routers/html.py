@@ -54,3 +54,34 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
         "table_detail.html",
         {"name": name, "display_name": display_name, "rendered": rendered},
     )
+
+
+@router.get("/tables/{name}/physical", response_class=HTMLResponse)
+def physical_detail(name: str, request: Request) -> HTMLResponse:
+    """物理設計ページを表示する。"""
+    if not table_service.validate_table_name(name):
+        raise HTTPException(status_code=422, detail=f"Invalid table name: '{name}'")
+    if not table_service.table_exists(name):
+        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
+
+    display_name = table_service.read_table_display_name(name)
+    has_physical = table_service.physical_design_exists(name)
+
+    rendered = ""
+    if has_physical:
+        md_content = table_service.read_physical_markdown(name)
+        if md_content is not None:
+            body = table_service.strip_title_heading(md_content)
+            expanded = table_service.render_markdown_with_embeds(body)
+            rendered = _md.render(expanded)
+
+    return templates.TemplateResponse(
+        request,
+        "physical_detail.html",
+        {
+            "name": name,
+            "display_name": display_name,
+            "has_physical": has_physical,
+            "rendered": rendered,
+        },
+    )

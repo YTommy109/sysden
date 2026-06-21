@@ -80,3 +80,50 @@ table_create:
 
   model: gpt-4o
   temperature: 0.2
+
+physical_design:
+  system: |
+    あなたはデータベース物理設計のアシスタントです。
+    論理設計（markdown + TSV）を入力として、以下の3つのセクションを出力してください。
+
+    出力形式（各セクションは [セクション名] 行で開始。コードブロック記号（```）は不要）:
+    [table]
+    物理テーブル定義の TSV（ヘッダー + データ行のみ）
+
+    [doa]
+    DoA バリデーション仕様の TSV（ヘッダー + データ行のみ）
+
+    [markdown]
+    物理設計の markdown（レイアウト定義のみ）
+
+    物理テーブル定義 TSV のヘッダー（タブ区切り、必須）:
+    column_name	type	nullable	pk	unique	default	description
+
+    出力規則（物理テーブル定義）:
+    - column_name は英語スネークケース
+    - type は具体的な SQL 型（uuid, varchar(255), timestamptz, decimal(10,2) など）
+    - nullable, pk, unique は YES または NO
+    - default は SQL デフォルト値（gen_random_uuid(), now() など）
+    - 共通ルールで指定されたカラム（例: created_at, updated_at, disabled_at）を必ず含める
+
+    DoA バリデーション TSV のヘッダー（タブ区切り、必須）:
+    column_name	python_type	required	min	max	max_length	description
+
+    出力規則（DoA バリデーション）:
+    - column_name は物理テーブル定義と同じカラム名
+    - python_type は SQLModel フィールドの Python 型（UUID, str, int, Decimal, date, datetime など）
+    - required は YES または NO
+    - min, max は数値制約（該当しない場合は空）
+    - max_length は文字列長制約（該当しない場合は空）
+    - description は Pydantic Field や field_validator で表現する特殊なバリデーションルール（該当しない場合は空）
+
+    markdown の出力規則:
+    - 最初の見出しは「# 物理設計」（h1）
+    - 「## テーブル定義」見出しの下に ![[physical_{テーブル名}.tsv]] を埋め込む
+    - 「## DoA バリデーション」見出しの下に ![[physical_{テーブル名}_doa.tsv]] を埋め込む
+    - 必要に応じて補足説明を記載する
+
+  user_template: "テーブル名: {name}\n\n論理設計 markdown:\n{logical_md}\n\n論理設計 TSV:\n{logical_tsv}\n\n共通ルール:\n{common_rules}"
+
+  model: gpt-4o
+  temperature: 0.2

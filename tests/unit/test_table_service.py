@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -738,6 +739,22 @@ def test_パストラバーサルの埋め込みは展開されない() -> None:
     assert "![[../../etc/passwd.tsv]]" in result
 
 
+def test_テーブル削除で物理設計ファイルも削除される(tmp_path: Path) -> None:
+    # Given: 論理設計と物理設計の両方が存在する
+    table_service.write_tsv("users", "column_name\ttype\nid\tUUID\n")
+    table_service.write_physical_tsv("users", "column_name\ttype\nid\tuuid\n")
+    table_service.write_physical_doa_tsv("users", "column_name\tpython_type\nid\tUUID\n")
+    table_service.write_physical_markdown("users", "# 物理設計\n")
+
+    # When: テーブルを削除する
+    table_service.delete_table("users")
+
+    # Then: 物理設計ファイルも削除される
+    assert not table_service.physical_design_exists("users")
+    assert table_service.read_physical_markdown("users") is None
+    assert not (tmp_path / "physical_users_doa.tsv").exists()
+
+
 def test_テーブル削除でMarkdownも削除される(sample_tsv: str) -> None:
     # Arrange — TSV と markdown の両方を作成
     table_service.write_tsv("orders", sample_tsv)
@@ -805,6 +822,71 @@ def test_h1がなければそのまま返る() -> None:
 
     # Assert
     assert result == content
+
+
+def test_テーブル一覧がphysicalプレフィックスを除外する(tmp_path: Path) -> None:
+    # Given: 論理設計と物理設計の TSV が混在する
+    (tmp_path / "users.tsv").write_text("column_name\ttype\n", encoding="utf-8")
+    (tmp_path / "physical_users.tsv").write_text("column_name\ttype\n", encoding="utf-8")
+    (tmp_path / "physical_users_doa.tsv").write_text("column_name\tpython_type\n", encoding="utf-8")
+
+    # When: テーブル一覧を取得する
+    result = table_service.list_tables()
+
+    # Then: physical_ プレフィックスのファイルは含まれない
+    assert result == ["users"]
+
+
+def test_物理設計の存在判定(tmp_path: Path) -> None:
+    # Given: 物理設計ファイルが存在しない
+    assert table_service.physical_design_exists("users") is False
+
+    # When: 物理設計 TSV を書き込む
+    table_service.write_physical_tsv("users", "column_name\ttype\nid\tuuid\n")
+
+    # Then: 存在判定が True になる
+    assert table_service.physical_design_exists("users") is True
+
+
+def test_物理設計markdownの読み書き(tmp_path: Path) -> None:
+    # Given: 物理設計 markdown が存在しない
+    assert table_service.read_physical_markdown("users") is None
+
+    # When: 物理設計 markdown を書き込む
+    table_service.write_physical_markdown("users", "# テーブル定義\n\n![[physical_users.tsv]]")
+
+    # Then: 読み込みで内容が取得できる
+    result = table_service.read_physical_markdown("users")
+    assert result is not None
+    assert "![[physical_users.tsv]]" in result
+
+
+def test_物理設計DoA_TSVの書き込み(tmp_path: Path) -> None:
+    # Given: データディレクトリが存在する
+
+    # When: DoA TSV を書き込む
+    content = "column_name\tpython_type\trequired\nid\tUUID\tYES\n"
+    table_service.write_physical_doa_tsv("users", content)
+
+    # Then: ファイルが作成される
+    path = tmp_path / "physical_users_doa.tsv"
+    assert path.exists()
+    assert "UUID" in path.read_text(encoding="utf-8")
+
+
+def test_汎用TSVレンダラーがデータ行の余分なタブでクラッシュしない(tmp_path: Path) -> None:
+    # Given: ヘッダーより多いフィールドを持つ TSV（AI が末尾タブを余分に返すケース）
+    tsv_content = "column_name\tpython_type\trequired\nid\tUUID\tYES\t\n"
+    table_service.write_physical_doa_tsv("users", tsv_content)
+    rows = table_service.read_tsv("physical_users_doa")
+
+    # When: 汎用 markdown テーブルに変換する
+    result = table_service._tsv_to_generic_markdown(rows)
+
+    # Then: None キーが無視されて正常にレンダリングされる
+    assert "column_name" in result
+    assert "python_type" in result
+    assert "None" not in result
 
 
 def test_テーブル一覧に表示名が含まれる(sample_tsv: str) -> None:
