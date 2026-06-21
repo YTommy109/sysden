@@ -28,6 +28,31 @@ description: テストコード（unit / integration / E2E）を追加・修正�
    - テストケースの網羅性は十分か（正常系・異常系・境界値が揃っているか）
    - parametrize に変換した場合、既存テストが壊れないことを確認する
 
+## テスト関数の命名規約
+
+- テスト関数名は**何をテストしているかがわかる簡潔な日本語**で付ける
+- 形式: `test_<日本語の動作説明>`（スネークケース・ローマ字ではなく日本語そのまま）
+- クラス名は `Test<対象><カテゴリ>` の英語のまま
+
+```python
+# ✅ 良い例: 何をテストしているか一目でわかる
+def test_テーブル名が空なら422を返す(client: TestClient) -> None: ...
+def test_AI生成結果をTSVに保存する(mock_openai: None) -> None: ...
+def test_存在しないテーブルの詳細は404(client: TestClient) -> None: ...
+def test_マークダウンがHTMLに変換される() -> None: ...
+
+# ❌ 悪い例: 英語で長くなり意図が読みにくい
+def test_create_table_with_empty_name_returns_422(): ...
+def test_ai_generated_result_is_saved_to_tsv(): ...
+```
+
+- parametrize と組み合わせる場合も日本語で:
+
+```python
+@pytest.mark.parametrize("name", ["", "123", "A-B", "a" * 65])
+def test_不正なテーブル名は422を返す(client: TestClient, name: str) -> None: ...
+```
+
 ## 共通規約
 
 - **unittest より pytest を優先**: `unittest.mock.patch` / `MagicMock` ではなく `monkeypatch` / `pytest.fixture` を使う
@@ -58,6 +83,21 @@ parametrize を使うべき典型的なケース:
 - 複数の無効入力に対して同じエラー（ステータスコード / 例外）を期待する
 - 境界値テスト（最小・最大・境界+1）
 - 型変換・マッピングのテスト
+
+## テスト時のロギング確認
+
+- プロダクトコードが適切なログを出しているかをテストで検証する
+- `caplog` fixture でログ出力をキャプチャし、期待するメッセージが記録されていることを確認する
+- 特にエラーパスでは、LLM が調査しやすいログ（操作・入力値・結果がセットで記録されている）が出ることを検証する
+
+```python
+def test_AI生成失敗時にテーブル名をログ出力する(caplog: pytest.LogCaptureFixture) -> None:
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(OpenAIError):
+            generate_table_design("users", "テスト")
+
+    assert "table=users" in caplog.text
+```
 
 ## ユニットテスト（`tests/unit/`）
 
@@ -110,7 +150,7 @@ def test_create_table_via_ai(client: TestClient, mock_openai: None) -> None:
 
 - **Gherkin (Given-When-Then)** コメントで各テストの意図を明示し、空行でブロック分けする
 - クラスで論理グループ化: `Test<Page><Category>` (例: `TestIndexPageEmpty`, `TestCreateTableForm`)
-- 関数名: `test_<what_is_being_tested>`
+- 関数名: `test_<日本語の動作説明>`（「テスト関数の命名規約」セクション参照）
 - ファイル: `test_<page_name>.py`（ページ単位）、`test_navigation.py`（ページ間遷移フロー）
 
 ### AI モック
