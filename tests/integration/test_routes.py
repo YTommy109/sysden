@@ -374,6 +374,56 @@ class TestTableNameValidation:
         assert resp.status_code != 422
 
 
+def test_create_multiple_tables_rolls_back_on_write_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: AI が 2 テーブルを返すが、2 件目の書き込みで失敗する
+    from app import table_service
+    from app.main import app
+
+    multi_response = (
+        "[users]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "\n"
+        "[users.md]\n"
+        "# users\n\n![[users.tsv]]\n"
+        "\n"
+        "[orders]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "\n"
+        "[orders.md]\n"
+        "# orders\n\n![[orders.tsv]]\n"
+    )
+    fake = make_fake_openai_client(tsv=multi_response)
+    monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+    call_count = 0
+    original_write_tsv = table_service.write_tsv
+
+    def failing_write_tsv(name: str, content: str) -> None:
+        nonlocal call_count
+        call_count += 1
+        if call_count >= 2:
+            raise OSError("disk full")
+        original_write_tsv(name, content)
+
+    monkeypatch.setattr(table_service, "write_tsv", failing_write_tsv)
+
+    # When: テーブル作成 API にリクエストを送る
+    no_raise_client = TestClient(app, raise_server_exceptions=False)
+    resp = no_raise_client.post(
+        "/api/tables",
+        data={"prompt": "ユーザーと注文テーブルを作って"},
+    )
+
+    # Then: 500 が返り、1 件目のテーブルもロールバックされている
+    assert resp.status_code == 500
+    assert not table_service.table_exists("users")
+    assert not table_service.table_exists("orders")
+
+
 def test_rebuild_index_tables(client: TestClient, sample_tsv: str) -> None:
     # Given: テーブルが存在するが index.tsv がない
     from app import table_service

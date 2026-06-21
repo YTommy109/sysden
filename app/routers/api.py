@@ -32,10 +32,17 @@ def create_table(
         _check_table_name(tbl_name)
         if table_service.table_exists(tbl_name):
             raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
-    for tbl_name, tbl_tsv, tbl_md in tables:
-        table_service.write_tsv(tbl_name, tbl_tsv)
-        if tbl_md:
-            table_service.write_markdown(tbl_name, tbl_md)
+    written: list[str] = []
+    try:
+        for tbl_name, tbl_tsv, tbl_md in tables:
+            table_service.write_tsv(tbl_name, tbl_tsv)
+            written.append(tbl_name)
+            if tbl_md:
+                table_service.write_markdown(tbl_name, tbl_md)
+    except Exception:
+        for written_name in written:
+            table_service.delete_table(written_name)
+        raise
     table_service.rebuild_index()
     if len(tables) == 1:
         return RedirectResponse(url=f"/tables/{tables[0][0]}", status_code=303)
@@ -60,8 +67,7 @@ def update_table(
 @router.post("/rebuild-index-tables")
 def rebuild_index_tables() -> RedirectResponse:
     """テーブル一覧 (index.tsv) と ER 図 (index.mmd) を再生成してトップページへリダイレクトする。"""
-    table_service.rebuild_index_tables()
-    table_service.rebuild_er_diagram_file()
+    table_service.rebuild_index()
     return RedirectResponse(url="/", status_code=303)
 
 
