@@ -244,3 +244,55 @@ class TestParseMultiTableResponse:
         # Act & Assert
         with pytest.raises(ValueError, match="テーブル定義"):
             ai_service._parse_multi_table_response("column_name\ttype\nid\tUUID\n")
+
+
+def test_generate_physical_design_テストモードでスタブを返す(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: テストモードが有効
+    monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
+
+    # When: 物理設計を生成する
+    md, tsv, doa = ai_service.generate_physical_design(
+        name="users",
+        logical_md="# ユーザー\n\n## テーブル設計\n\n![[users.tsv]]",
+        logical_tsv="column_name\ttype\nid\tUUID\n",
+    )
+
+    # Then: スタブが返る
+    assert "physical_users.tsv" in md
+    assert "column_name\t" in tsv
+    assert "column_name\t" in doa
+
+
+def test_parse_physical_response_正常系() -> None:
+    # Given: 3 セクションを含むレスポンス
+    content = (
+        "[table]\n"
+        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+        "id\tuuid\tNO\tYES\tYES\tgen_random_uuid()\t主キー\n"
+        "\n"
+        "[doa]\n"
+        "column_name\tpython_type\trequired\tmin\tmax\tmax_length\tdescription\n"
+        "id\tUUID\tYES\t\t\t\t\n"
+        "\n"
+        "[markdown]\n"
+        "# 物理設計\n\n## テーブル定義\n\n![[physical_users.tsv]]\n"
+    )
+
+    # When: パースする
+    md, tsv, doa = ai_service._parse_physical_response(content)
+
+    # Then: 各セクションが正しく抽出される
+    assert "physical_users.tsv" in md
+    assert "uuid" in tsv
+    assert "UUID" in doa
+
+
+def test_parse_physical_response_セクション不足でエラー() -> None:
+    # Given: doa セクションが欠けたレスポンス
+    content = "[table]\ncolumn_name\ttype\nid\tuuid\n\n[markdown]\n# 物理設計\n"
+
+    # When/Then: ValueError が発生する
+    with pytest.raises(ValueError, match="セクションが不足"):
+        ai_service._parse_physical_response(content)

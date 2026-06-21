@@ -18,6 +18,22 @@ _STUB_MD = "# スタブ\n\n## 概要\n\nテスト用テーブル。\n\n## テー
 
 _SECTION_RE = re.compile(r"^\[([^\]]+)\]$")
 
+_STUB_PHYSICAL_TSV = (
+    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
+    "id\tuuid\tNO\tYES\tYES\tgen_random_uuid()\t主キー\n"
+)
+
+_STUB_PHYSICAL_DOA_TSV = (
+    "column_name\tpython_type\trequired\tmin\tmax\tmax_length\tdescription\nid\tUUID\tYES\t\t\t\t\n"
+)
+
+_STUB_PHYSICAL_MD = (
+    "# 物理設計\n\n## テーブル定義\n\n![[physical_stub_table.tsv]]\n\n"
+    "## DoA バリデーション\n\n![[physical_stub_table_doa.tsv]]\n"
+)
+
+_PHYSICAL_SECTION_RE = re.compile(r"^\[(table|doa|markdown)\]$")
+
 _PROMPTS_PATH = Path(__file__).parent.parent / "prompts" / "ai_prompts.yaml"
 
 
@@ -163,3 +179,86 @@ def create_table_design(prompt: str) -> list[tuple[str, str, str]]:
         raise
     logger.info("AI テーブル作成完了: tables=%d", len(tables))
     return tables
+
+
+def _parse_physical_response(content: str) -> tuple[str, str, str]:
+    """物理設計レスポンスの [table]/[doa]/[markdown] セクションをパースする。
+
+    Returns:
+        (markdown, table_tsv, doa_tsv) のタプル。
+
+    Raises:
+        ValueError: 必須セクションが欠けている場合。
+    """
+    sections: dict[str, str] = {}
+    current: str | None = None
+    lines: list[str] = []
+
+    for line in content.splitlines():
+        m = _PHYSICAL_SECTION_RE.match(line.strip())
+        if m:
+            if current is not None:
+                sections[current] = "\n".join(lines).strip() + "\n"
+            current = m.group(1)
+            lines = []
+        elif current is not None:
+            lines.append(line)
+
+    if current is not None:
+        sections[current] = "\n".join(lines).strip() + "\n"
+
+    missing = {"table", "doa", "markdown"} - sections.keys()
+    if missing:
+        raise ValueError(f"物理設計のセクションが不足しています: {missing}")
+
+    return sections["markdown"], sections["table"], sections["doa"]
+
+
+def generate_physical_design(
+    name: str,
+    logical_md: str,
+    logical_tsv: str,
+    common_rules: str | None = None,
+) -> tuple[str, str, str]:
+    """AI に物理設計を生成させる。
+
+    Args:
+        name: テーブル名。
+        logical_md: 論理設計の markdown。
+        logical_tsv: 論理設計の TSV。
+        common_rules: 共通ルール（index.md の内容）。
+
+    Returns:
+        (physical_md, physical_tsv, physical_doa_tsv) のタプル。
+    """
+    if os.environ.get("SYSDEN_TEST_MODE") == "1":
+        logger.info("AI 物理設計生成スキップ (テストモード)")
+        stub_md = _STUB_PHYSICAL_MD.replace("stub_table", name)
+        return stub_md, _STUB_PHYSICAL_TSV, _STUB_PHYSICAL_DOA_TSV
+
+    logger.info("AI 物理設計生成開始: table=%s", name)
+    config = _load_prompts()["physical_design"]
+    user_message = config["user_template"].format(
+        name=name,
+        logical_md=logical_md,
+        logical_tsv=logical_tsv,
+        common_rules=common_rules or "なし",
+    )
+
+    client = get_client()
+    try:
+        response = client.chat.completions.create(
+            model=config["model"],
+            messages=[
+                {"role": "system", "content": config["system"]},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=config["temperature"],
+        )
+    except Exception:
+        logger.exception("AI 物理設計生成失敗: table=%s", name)
+        raise
+    content = response.choices[0].message.content or ""
+    result = _parse_physical_response(content)
+    logger.info("AI 物理設計生成完了: table=%s", name)
+    return result
