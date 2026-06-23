@@ -916,6 +916,50 @@ def test_Markdownなしの表示名はファイル名(sample_tsv: str) -> None:
     assert tables[0]["display_name"] == "users"
 
 
+def test_indexYAMLが存在しなければ次のテーブルIDは1() -> None:
+    # Arrange — 空のデータディレクトリ（conftest が tmp_path を設定済み）
+
+    # Act
+    result = table_service.read_next_table_id()
+
+    # Assert
+    assert result == 1
+
+
+def test_nextTableIdの保存と読み込み() -> None:
+    # Arrange
+    table_service.save_next_table_id(5)
+
+    # Act
+    result = table_service.read_next_table_id()
+
+    # Assert
+    assert result == 5
+
+
+def test_テーブルシンボルの採番() -> None:
+    # Arrange — 初期状態（next_table_id = 1）
+
+    # Act
+    symbols = table_service.allocate_table_symbols(3)
+
+    # Assert
+    assert symbols == ["TABLE_0001", "TABLE_0002", "TABLE_0003"]
+    assert table_service.read_next_table_id() == 4
+
+
+def test_テーブルシンボルの連続採番() -> None:
+    # Arrange — 既に 2 まで採番済み
+    table_service.save_next_table_id(3)
+
+    # Act
+    symbols = table_service.allocate_table_symbols(2)
+
+    # Assert
+    assert symbols == ["TABLE_0003", "TABLE_0004"]
+    assert table_service.read_next_table_id() == 5
+
+
 class TestTableServiceLogging:
     """テーブルサービスのログ出力検証。"""
 

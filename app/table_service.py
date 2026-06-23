@@ -2,6 +2,8 @@ import csv
 import logging
 import re
 
+import yaml
+
 from app.config import get_data_dir
 
 logger = logging.getLogger(__name__)
@@ -9,6 +11,33 @@ logger = logging.getLogger(__name__)
 TSV_HEADERS = ["column_name", "type", "nullable", "pk", "unique", "default", "description"]
 _INDEX_STEM = "index"
 _TABLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def read_next_table_id() -> int:
+    """index.yaml から次のテーブル ID を読む。ファイルがなければ 1。"""
+    path = get_data_dir() / "index.yaml"
+    if not path.exists():
+        return 1
+    with path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    return data.get("next_table_id", 1)
+
+
+def save_next_table_id(next_id: int) -> None:
+    """index.yaml に次のテーブル ID を書き込む。"""
+    d = get_data_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    path = d / "index.yaml"
+    with path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump({"next_table_id": next_id}, f)
+
+
+def allocate_table_symbols(count: int) -> list[str]:
+    """count 個のテーブルシンボルを採番し、index.yaml を更新して返す。"""
+    start = read_next_table_id()
+    symbols = [f"TABLE_{start + i:04d}" for i in range(count)]
+    save_next_table_id(start + count)
+    return symbols
 
 
 def validate_table_name(name: str) -> bool:
