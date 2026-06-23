@@ -46,10 +46,10 @@
     <tbody>
       {% for t in tables %}
       <tr>
-        <td><a href="/tables/{{ t.name }}">{{ t.display_name }}</a></td>
+        <td><a href="/tables/{{ t.physical_name }}">{{ t.logical_name }}</a></td>
         <td style="text-align:right;">
-          <button hx-delete="/api/tables/{{ t.name }}"
-                  hx-confirm="{{ t.display_name }} を削除しますか？"
+          <button hx-delete="/api/tables/{{ t.physical_name }}"
+                  hx-confirm="{{ t.logical_name }} を削除しますか？"
                   hx-target="closest tr"
                   hx-swap="outerHTML"
                   style="background:#c00; padding:0.3rem 0.75rem; border:none; color:white; cursor:pointer; border-radius:3px; font-size:0.85rem;">削除</button>

@@ -610,13 +610,14 @@ def test_テーブル一覧を再作成する(client: TestClient, sample_tsv: st
     from app import table_service
 
     table_service.write_tsv("users", sample_tsv)
+    table_service.register_table("TABLE_0001", "users")
 
     # When: テーブル一覧再作成 API にリクエストを送る
     resp = client.post("/api/rebuild-index-tables", follow_redirects=True)
 
     # Then: 200 が返り index.tsv が生成される
     assert resp.status_code == 200
-    names = [t["name"] for t in table_service.read_index_tables()]
+    names = [t["physical_name"] for t in table_service.read_index_tables()]
     assert names == ["users"]
 
 

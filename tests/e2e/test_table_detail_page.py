@@ -62,8 +62,8 @@ class TestTableDetailDisplay:
         # Then: ヘッダーに日本語カラム名が含まれる
         expect(table_view.locator("th", has_text="カラム名")).to_be_visible()
 
-        # Then: データ行に "id" が含まれる（PK は太字で表示）
-        expect(table_view.locator("td >> strong", has_text="id")).to_be_visible()
+        # Then: データ行に "識別子" が含まれる（PK は太字で表示）
+        expect(table_view.locator("td >> strong", has_text="識別子")).to_be_visible()
 
     def test_更新フォームが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]

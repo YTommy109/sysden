@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from collections.abc import Callable
 from typing import Annotated
 
@@ -48,31 +49,38 @@ def create_table(
     複数テーブル生成時、途中で失敗したら作成済みファイルをロールバックする。
     """
     logger.info("テーブル作成リクエスト: name=%s prompt_length=%d", name, len(prompt))
+    next_id = table_service.read_next_table_id()
     if name is None:
-        tables = ai_service.create_table_design(prompt)
+        tables = ai_service.create_table_design(prompt, next_table_id=next_id)
     else:
         _check_table_name(name)
-        tsv = ai_service.generate_table_design(prompt)
+        symbol = f"TABLE_{next_id:04d}"
+        tsv = ai_service.generate_table_design(prompt, table_symbol=symbol)
         default_md = f"# {name}\n\n## 概要\n\n## テーブル設計\n\n![[{name}.tsv]]\n"
-        tables = [(name, tsv, default_md)]
-    for tbl_name, _, _ in tables:
-        _check_table_name(tbl_name)
-        if table_service.table_exists(tbl_name):
-            raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
+        tables = [(symbol, tsv, default_md)]
     written: list[str] = []
     try:
-        for tbl_name, tbl_tsv, tbl_md in tables:
+        for symbol, tbl_tsv, tbl_md in tables:
+            embed_match = re.search(r"!\[\[([A-Za-z0-9_]+)\.tsv\]\]", tbl_md)
+            tbl_name = embed_match.group(1) if embed_match else symbol.lower()
+            _check_table_name(tbl_name)
+            if table_service.table_exists(tbl_name):
+                raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
             table_service.write_tsv(tbl_name, tbl_tsv)
             written.append(tbl_name)
             if tbl_md:
                 table_service.write_markdown(tbl_name, tbl_md)
+            table_service.register_table(symbol, tbl_name)
     except Exception:
         for written_name in written:
             table_service.delete_table(written_name)
+            table_service.unregister_table(written_name)
         raise
+    table_service.save_next_table_id(next_id + len(tables))
     table_service.rebuild_index()
     logger.info("テーブル作成完了: tables=%s", [t[0] for t in tables])
-    redirect_url = f"/tables/{tables[0][0]}" if len(tables) == 1 else "/"
+    first_name = written[0] if written else ""
+    redirect_url = f"/tables/{first_name}" if len(tables) == 1 else "/"
     if request.headers.get("HX-Request"):
         return Response(headers={"HX-Redirect": redirect_url})
     return RedirectResponse(url=redirect_url, status_code=303)
@@ -91,7 +99,8 @@ def update_table(
         current_tsv = table_service.read_tsv_raw(name)
     except FileNotFoundError as err:
         raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
-    tsv = ai_service.generate_table_design(prompt, current_tsv)
+    symbol = table_service.get_table_symbol(name)
+    tsv = ai_service.generate_table_design(prompt, current_tsv, table_symbol=symbol)
     table_service.write_tsv(name, tsv)
     logger.info("テーブル更新完了: table=%s", name)
     redirect_url = f"/tables/{name}"
@@ -161,6 +170,7 @@ def delete_table(name: str) -> dict[str, str]:
         table_service.delete_table(name)
     except FileNotFoundError as err:
         raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
+    table_service.unregister_table(name)
     table_service.rebuild_index()
     logger.info("テーブル削除完了: table=%s", name)
     return {"status": "deleted", "name": name}
