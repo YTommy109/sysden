@@ -508,6 +508,8 @@ def test_テーブル一覧にindexは含まれない(sample_tsv: str) -> None:
 
 def test_インデックス再構築でファイルが生成される(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "users")
+    table_service.register_table("TABLE_0002", "orders")
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
 
@@ -538,6 +540,8 @@ def test_テーブルなしでもインデックスファイルが生成され�
 
 def test_インデックスからテーブル一覧を読み込む(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "orders")
+    table_service.register_table("TABLE_0002", "users")
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
     table_service.rebuild_index()
@@ -545,10 +549,12 @@ def test_インデックスからテーブル一覧を読み込む(sample_tsv: s
     # Act
     result = table_service.read_index_tables()
 
-    # Assert — name と display_name を含む辞書のリスト
+    # Assert — symbol, logical_name, physical_name を含む辞書のリスト
     assert len(result) == 2
-    assert result[0]["name"] == "orders"
-    assert result[1]["name"] == "users"
+    assert result[0]["physical_name"] == "orders"
+    assert result[0]["symbol"] == "TABLE_0001"
+    assert result[1]["physical_name"] == "users"
+    assert result[1]["symbol"] == "TABLE_0002"
 
 
 def test_空のインデックスは空リスト() -> None:
@@ -608,6 +614,8 @@ def test_ER図ファイルがなければ空文字列() -> None:
 
 def test_テーブル一覧再構築でTSVが生成される(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "orders")
+    table_service.register_table("TABLE_0002", "users")
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
 
@@ -620,7 +628,7 @@ def test_テーブル一覧再構築でTSVが生成される(sample_tsv: str) ->
     d = get_data_dir()
     assert (d / "index.tsv").exists()
     assert not (d / "index.mmd").exists()
-    names = [t["name"] for t in table_service.read_index_tables()]
+    names = [t["physical_name"] for t in table_service.read_index_tables()]
     assert names == ["orders", "users"]
 
 
@@ -892,29 +900,49 @@ def test_汎用TSVレンダラーがデータ行の余分なタブでクラッ�
 
 def test_テーブル一覧に表示名が含まれる(sample_tsv: str) -> None:
     # Arrange — markdown 付きテーブルを作成
+    table_service.register_table("TABLE_0001", "products")
     table_service.write_tsv("products", sample_tsv)
     table_service.write_markdown("products", "# プロダクト\n\n## 概要\n\n![[products.tsv]]")
 
     # Act
     table_service.rebuild_index_tables()
 
-    # Assert — display_name が日本語になる
+    # Assert — logical_name が日本語になる
     tables = table_service.read_index_tables()
-    assert tables[0]["name"] == "products"
-    assert tables[0]["display_name"] == "プロダクト"
+    assert tables[0]["physical_name"] == "products"
+    assert tables[0]["logical_name"] == "プロダクト"
 
 
 def test_Markdownなしの表示名はファイル名(sample_tsv: str) -> None:
     # Arrange — markdown なしのテーブル
+    table_service.register_table("TABLE_0001", "users")
     table_service.write_tsv("users", sample_tsv)
 
     # Act
     table_service.rebuild_index_tables()
 
-    # Assert — display_name はファイル名と同じ
+    # Assert — logical_name はファイル名と同じ
     tables = table_service.read_index_tables()
-    assert tables[0]["name"] == "users"
-    assert tables[0]["display_name"] == "users"
+    assert tables[0]["physical_name"] == "users"
+    assert tables[0]["logical_name"] == "users"
+
+
+def test_インデックス再構築でシンボル付きTSVが生成される(sample_tsv: str) -> None:
+    # Arrange — シンボルを採番してテーブルを作成
+    table_service.allocate_table_symbols(1)
+    table_service.register_table("TABLE_0001", "users")
+    table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
+
+    # Act
+    table_service.rebuild_index_tables()
+
+    # Assert
+    tables = table_service.read_index_tables()
+    assert len(tables) == 1
+    assert tables[0]["symbol"] == "TABLE_0001"
+    assert tables[0]["logical_name"] == "ユーザー"
+    assert tables[0]["physical_name"] == "users"
 
 
 def test_indexYAMLが存在しなければ次のテーブルIDは1() -> None:

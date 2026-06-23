@@ -24,23 +24,65 @@ _INDEX_STEM = "index"
 _TABLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
-def read_next_table_id() -> int:
-    """index.yaml から次のテーブル ID を読む。ファイルがなければ 1。"""
+def _read_index_yaml() -> dict:
+    """index.yaml を読み込む。ファイルがなければ空辞書。"""
     path = get_data_dir() / "index.yaml"
     if not path.exists():
-        return 1
+        return {}
     with path.open(encoding="utf-8") as f:
-        data = yaml.safe_load(f) or {}
-    return data.get("next_table_id", 1)
+        return yaml.safe_load(f) or {}
 
 
-def save_next_table_id(next_id: int) -> None:
-    """index.yaml に次のテーブル ID を書き込む。"""
+def _save_index_yaml(data: dict) -> None:
+    """index.yaml を書き込む。"""
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     path = d / "index.yaml"
     with path.open("w", encoding="utf-8") as f:
-        yaml.safe_dump({"next_table_id": next_id}, f)
+        yaml.safe_dump(data, f, allow_unicode=True)
+
+
+def read_next_table_id() -> int:
+    return _read_index_yaml().get("next_table_id", 1)
+
+
+def save_next_table_id(next_id: int) -> None:
+    data = _read_index_yaml()
+    data["next_table_id"] = next_id
+    _save_index_yaml(data)
+
+
+def register_table(symbol: str, physical_name: str) -> None:
+    """テーブルのシンボル→物理名の対応を index.yaml に登録する。"""
+    data = _read_index_yaml()
+    tables = data.setdefault("tables", {})
+    tables[symbol] = physical_name
+    _save_index_yaml(data)
+
+
+def unregister_table(physical_name: str) -> None:
+    """テーブルの登録を index.yaml から削除する。"""
+    data = _read_index_yaml()
+    tables = data.get("tables", {})
+    to_remove = [s for s, p in tables.items() if p == physical_name]
+    for s in to_remove:
+        del tables[s]
+    _save_index_yaml(data)
+
+
+def get_table_symbol(physical_name: str) -> str | None:
+    """physical_name からシンボルを逆引きする。"""
+    tables = _read_index_yaml().get("tables", {})
+    for symbol, pname in tables.items():
+        if pname == physical_name:
+            return symbol
+    return None
+
+
+def get_symbol_display_map() -> dict[str, str]:
+    """シンボル→論理名（表示名）のマップを返す。"""
+    tables = _read_index_yaml().get("tables", {})
+    return {symbol: read_table_display_name(pname) for symbol, pname in tables.items()}
 
 
 def allocate_table_symbols(count: int) -> list[str]:
@@ -406,10 +448,13 @@ def rebuild_index_tables() -> None:
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     names = list_tables()
-    lines = ["name\tdisplay_name"]
+    lines = ["symbol\tlogical_name\tphysical_name"]
     for name in names:
+        symbol = get_table_symbol(name)
+        if symbol is None:
+            continue
         display_name = read_table_display_name(name)
-        lines.append(f"{name}\t{display_name}")
+        lines.append(f"{symbol}\t{display_name}\t{name}")
     (d / f"{_INDEX_STEM}.tsv").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -435,7 +480,7 @@ def read_index_tables() -> list[dict[str, str]]:
     """index.tsv からテーブル名一覧を読み込む。
 
     Returns:
-        name と display_name を含む辞書のリスト。ファイルが存在しなければ空リスト。
+        symbol, logical_name, physical_name を含む辞書のリスト。ファイルが存在しなければ空リスト。
     """
     path = get_data_dir() / f"{_INDEX_STEM}.tsv"
     if not path.exists():
@@ -443,7 +488,11 @@ def read_index_tables() -> list[dict[str, str]]:
     with path.open(encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
         return [
-            {"name": row["name"], "display_name": row.get("display_name", row["name"])}
+            {
+                "symbol": row["symbol"],
+                "logical_name": row["logical_name"],
+                "physical_name": row["physical_name"],
+            }
             for row in reader
         ]
 
