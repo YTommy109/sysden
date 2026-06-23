@@ -6,12 +6,12 @@ from app import ai_service
 from tests.conftest import make_fake_openai_client
 
 MULTI_TABLE_RESPONSE = (
-    "[users]\n"
-    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "[TABLE_0001]\n"
+    "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+    "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t主キー\n"
     "\n"
-    "[users.md]\n"
-    "# users テーブル\n"
+    "[TABLE_0001.md]\n"
+    "# ユーザー\n"
     "\n"
     "ユーザー情報を管理する。\n"
     "\n"
@@ -19,13 +19,13 @@ MULTI_TABLE_RESPONSE = (
     "\n"
     "![[users.tsv]]\n"
     "\n"
-    "[orders]\n"
-    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    "user_id\tUUID\tNO\tNO\tNO\t\t注文者\n"
+    "[TABLE_0002]\n"
+    "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+    "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t主キー\n"
+    "COLUMN_0002\t注文者\tuser_id\tUUID\tNO\tNO\tNO\t\tTABLE_0001\t\n"
     "\n"
-    "[orders.md]\n"
-    "# orders テーブル\n"
+    "[TABLE_0002.md]\n"
+    "# 注文\n"
     "\n"
     "注文情報を管理する。\n"
     "\n"
@@ -35,12 +35,12 @@ MULTI_TABLE_RESPONSE = (
 )
 
 SINGLE_TABLE_RESPONSE = (
-    "[users]\n"
-    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "[TABLE_0001]\n"
+    "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+    "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t主キー\n"
     "\n"
-    "[users.md]\n"
-    "# users テーブル\n"
+    "[TABLE_0001.md]\n"
+    "# ユーザー\n"
     "\n"
     "ユーザー情報を管理する。\n"
     "\n"
@@ -65,8 +65,8 @@ def test_AI生成でOpenAIが呼ばれる(mock_openai: list[dict]) -> None:
     result = ai_service.generate_table_design("ユーザーテーブル")
 
     # Assert
-    assert "column_name" in result
-    assert "id" in result
+    assert "symbol" in result
+    assert "COLUMN_0001" in result
     assert len(mock_openai) == 1
 
 
@@ -102,8 +102,8 @@ def test_単一テーブルの生成(monkeypatch: pytest.MonkeyPatch) -> None:
     # Assert
     assert len(tables) == 1
     name, tsv, md = tables[0]
-    assert name == "users"
-    assert "column_name" in tsv
+    assert name == "TABLE_0001"
+    assert "COLUMN_0001\t" in tsv
     assert "![[users.tsv]]" in md
 
 
@@ -117,9 +117,9 @@ def test_複数テーブルの生成(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Assert
     assert len(tables) == 2
-    assert tables[0][0] == "users"
-    assert tables[1][0] == "orders"
-    assert "user_id" in tables[1][1]
+    assert tables[0][0] == "TABLE_0001"
+    assert tables[1][0] == "TABLE_0002"
+    assert "TABLE_0001" in tables[1][1]
     assert "![[orders.tsv]]" in tables[1][2]
 
 
@@ -134,9 +134,9 @@ def test_テストモードでスタブを返す(monkeypatch: pytest.MonkeyPatch
     assert len(tables) == 1
     name, tsv, md = tables[0]
     assert isinstance(name, str)
-    assert len(name) > 0
-    assert "column_name" in tsv
-    assert f"![[{name}.tsv]]" in md
+    assert name.startswith("TABLE_")
+    assert "symbol" in tsv
+    assert "COLUMN_0001" in tsv
 
 
 class TestAiServiceLogging:
@@ -207,8 +207,8 @@ class TestParseMultiTableResponse:
         # Assert
         assert len(result) == 1
         name, tsv, md = result[0]
-        assert name == "users"
-        assert "id\tUUID" in tsv
+        assert name == "TABLE_0001"
+        assert "COLUMN_0001\t" in tsv
         assert "![[users.tsv]]" in md
 
     def test_複数テーブルをパースする(self) -> None:
@@ -217,15 +217,15 @@ class TestParseMultiTableResponse:
 
         # Assert
         assert len(result) == 2
-        assert result[0][0] == "users"
-        assert result[1][0] == "orders"
-        assert "![[users.tsv]]" in result[0][2]
-        assert "![[orders.tsv]]" in result[1][2]
+        assert result[0][0] == "TABLE_0001"
+        assert result[1][0] == "TABLE_0002"
+        assert "TABLE_0001" in result[1][1]  # fk_target
 
     def test_前後の空白を除去する(self) -> None:
         # Arrange
         text = (
-            "\n\n[users]\ncolumn_name\ttype\nid\tUUID\n\n[users.md]\n# users\n\n![[users.tsv]]\n\n"
+            "\n\n[TABLE_0001]\nsymbol\tlogical_name\nCOLUMN_0001\t識別子\n"
+            "\n[TABLE_0001.md]\n# テーブル\n\n![[table.tsv]]\n\n"
         )
 
         # Act
@@ -233,7 +233,7 @@ class TestParseMultiTableResponse:
 
         # Assert
         assert len(result) == 1
-        assert result[0][0] == "users"
+        assert result[0][0] == "TABLE_0001"
 
     def test_空レスポンスでValueError(self) -> None:
         # Act & Assert

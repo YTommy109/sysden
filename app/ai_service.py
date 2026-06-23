@@ -9,8 +9,8 @@ from openai import OpenAI
 logger = logging.getLogger(__name__)
 
 _STUB_TSV = (
-    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+    "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t主キー\n"
 )
 
 _STUB_MD = "# スタブ\n\n## 概要\n\nテスト用テーブル。\n\n## テーブル設計\n\n![[stub_table.tsv]]\n"
@@ -108,12 +108,17 @@ def _parse_multi_table_response(content: str) -> list[tuple[str, str, str]]:
     return result
 
 
-def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
+def generate_table_design(
+    prompt: str,
+    current_tsv: str | None = None,
+    table_symbol: str | None = None,
+) -> str:
     """AI にテーブル設計（TSV）を生成または更新させる。
 
     Args:
         prompt: ユーザーからの依頼テキスト。
         current_tsv: 既存のカラム定義 TSV。指定時は更新モードで動作する。
+        table_symbol: 更新対象テーブルのシンボル（例: TABLE_0001）。
 
     Returns:
         生成されたカラム定義の TSV 文字列。
@@ -128,7 +133,11 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
 
     user_message = prompt
     if current_tsv:
-        user_message = config["user_update_template"].format(current_tsv=current_tsv, prompt=prompt)
+        user_message = config["user_update_template"].format(
+            current_tsv=current_tsv,
+            prompt=prompt,
+            table_symbol=table_symbol or "",
+        )
 
     client = get_client()
     try:
@@ -148,27 +157,30 @@ def generate_table_design(prompt: str, current_tsv: str | None = None) -> str:
     return result
 
 
-def create_table_design(prompt: str) -> list[tuple[str, str, str]]:
+def create_table_design(prompt: str, next_table_id: int = 1) -> list[tuple[str, str, str]]:
     """AI にテーブル名とカラム定義（TSV）と説明（markdown）を生成させる。
 
     Args:
         prompt: ユーザーからの依頼テキスト。
+        next_table_id: 採番開始番号。AI はこの番号から TABLE_XXXX シンボルを生成する。
 
     Returns:
-        ``(テーブル名, TSV 文字列, markdown 文字列)`` のリスト。
+        ``(シンボル, TSV 文字列, markdown 文字列)`` のリスト。シンボルは TABLE_XXXX 形式。
     """
     if os.environ.get("SYSDEN_TEST_MODE") == "1":
         logger.info("AI テーブル作成スキップ (テストモード)")
-        return [("stub_table", _STUB_TSV, _STUB_MD)]
+        symbol = f"TABLE_{next_table_id:04d}"
+        return [(symbol, _STUB_TSV, _STUB_MD)]
 
     logger.info("AI テーブル作成開始: prompt_length=%d", len(prompt))
     config = _load_prompts()["table_create"]
+    system_msg = config["system"].format(next_table_id=next_table_id)
     client = get_client()
     try:
         response = client.chat.completions.create(
             model=config["model"],
             messages=[
-                {"role": "system", "content": config["system"]},
+                {"role": "system", "content": system_msg},
                 {"role": "user", "content": prompt},
             ],
             temperature=config["temperature"],
