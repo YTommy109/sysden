@@ -82,12 +82,15 @@ def test_TSVをMarkdownテーブルに変換する() -> None:
     # Arrange
     rows = [
         {
-            "column_name": "id",
+            "symbol": "COLUMN_0001",
+            "logical_name": "識別子",
+            "physical_name": "id",
             "type": "UUID",
             "nullable": "NO",
             "pk": "YES",
             "unique": "YES",
             "default": "",
+            "fk_target": "",
             "description": "主キー",
         }
     ]
@@ -95,13 +98,13 @@ def test_TSVをMarkdownテーブルに変換する() -> None:
     # Act
     md = table_service.tsv_to_markdown(rows)
 
-    # Assert — 日本語ヘッダー、PK 太字、必須は型に * プレフィックス
+    # Assert — 日本語ヘッダー、PK 太字（論理名）、必須は型に * プレフィックス
     assert "| カラム名 |" in md
     assert "| 型 |" in md
     assert "| 必須 |" not in md
     assert "| ユニーク |" in md
     assert "| 説明 |" in md
-    assert "| **id** |" in md
+    assert "| **識別子** |" in md
     assert '| <span class="required">*</span> UUID |' in md
     assert "---" in md
 
@@ -110,21 +113,27 @@ def test_必須カラムの型に必須マークが付く() -> None:
     # Arrange
     rows = [
         {
-            "column_name": "id",
+            "symbol": "COLUMN_0001",
+            "logical_name": "識別子",
+            "physical_name": "id",
             "type": "UUID",
             "nullable": "NO",
             "pk": "NO",
             "unique": "NO",
             "default": "",
+            "fk_target": "",
             "description": "",
         },
         {
-            "column_name": "memo",
+            "symbol": "COLUMN_0002",
+            "logical_name": "メモ",
+            "physical_name": "memo",
             "type": "TEXT",
             "nullable": "YES",
             "pk": "NO",
             "unique": "NO",
             "default": "",
+            "fk_target": "",
             "description": "",
         },
     ]
@@ -134,8 +143,8 @@ def test_必須カラムの型に必須マークが付く() -> None:
 
     # Assert — nullable=NO → 型に * プレフィックス、nullable=YES → そのまま
     lines = md.split("\n")
-    id_line = next(line for line in lines if "| id |" in line)
-    memo_line = next(line for line in lines if "| memo |" in line)
+    id_line = next(line for line in lines if "| 識別子 |" in line)
+    memo_line = next(line for line in lines if "| メモ |" in line)
     assert '| <span class="required">*</span> UUID |' in id_line
     assert "| テキスト |" in memo_line
 
@@ -144,21 +153,27 @@ def test_PKカラム名が太字になる() -> None:
     # Arrange
     rows = [
         {
-            "column_name": "id",
+            "symbol": "COLUMN_0001",
+            "logical_name": "識別子",
+            "physical_name": "id",
             "type": "UUID",
             "nullable": "NO",
             "pk": "YES",
             "unique": "YES",
             "default": "",
+            "fk_target": "",
             "description": "主キー",
         },
         {
-            "column_name": "name",
+            "symbol": "COLUMN_0002",
+            "logical_name": "ユーザー名",
+            "physical_name": "name",
             "type": "VARCHAR(100)",
             "nullable": "NO",
             "pk": "NO",
             "unique": "NO",
             "default": "",
+            "fk_target": "",
             "description": "ユーザー名",
         },
     ]
@@ -166,9 +181,9 @@ def test_PKカラム名が太字になる() -> None:
     # Act
     md = table_service.tsv_to_markdown(rows)
 
-    # Assert — PK カラムは太字、非 PK は素のまま
-    assert "| **id** |" in md
-    assert "| name |" in md
+    # Assert — PK カラムは太字（論理名）、非 PK は素のまま
+    assert "| **識別子** |" in md
+    assert "| ユーザー名 |" in md
 
 
 @pytest.mark.parametrize(
@@ -195,17 +210,19 @@ def test_型名が日本語に変換される(input_type: str, expected: str) ->
     assert _translate_type(input_type) == expected
 
 
-def test_FKカラムにfkクラスが付く(sample_tsv: str) -> None:
-    # Arrange — users テーブルを作成して user_id カラムを持つ行を表示
-    table_service.write_tsv("users", sample_tsv)
+def test_FKカラムにfkクラスが付く() -> None:
+    # Arrange — fk_target 列でFK判定
     rows = [
         {
-            "column_name": "user_id",
+            "symbol": "COLUMN_0001",
+            "logical_name": "注文者",
+            "physical_name": "user_id",
             "type": "UUID",
             "nullable": "NO",
             "pk": "NO",
             "unique": "NO",
             "default": "",
+            "fk_target": "TABLE_0001",
             "description": "",
         },
     ]
@@ -213,20 +230,23 @@ def test_FKカラムにfkクラスが付く(sample_tsv: str) -> None:
     # Act
     md = table_service.tsv_to_markdown(rows)
 
-    # Assert — FK カラム名が fk クラスの span で囲まれる
-    assert '<span class="fk">user_id</span>' in md
+    # Assert — FK カラム名（論理名）が fk クラスの span で囲まれる
+    assert '<span class="fk">注文者</span>' in md
 
 
 def test_非FKカラムにfkクラスは付かない() -> None:
-    # Arrange — FK でない通常カラム
+    # Arrange — fk_target が空
     rows = [
         {
-            "column_name": "name",
+            "symbol": "COLUMN_0001",
+            "logical_name": "ユーザー名",
+            "physical_name": "name",
             "type": "VARCHAR(100)",
             "nullable": "NO",
             "pk": "NO",
             "unique": "NO",
             "default": "",
+            "fk_target": "",
             "description": "",
         },
     ]
@@ -242,12 +262,15 @@ def test_説明にデフォルトプレフィックスが付かない() -> None:
     # Arrange
     rows = [
         {
-            "column_name": "end_date",
+            "symbol": "COLUMN_0001",
+            "logical_name": "発売終了日",
+            "physical_name": "end_date",
             "type": "DATE",
             "nullable": "NO",
             "pk": "NO",
             "unique": "NO",
             "default": "9999-12-31",
+            "fk_target": "",
             "description": "発売終了日（未定の場合は 9999-12-31）",
         }
     ]
@@ -257,7 +280,7 @@ def test_説明にデフォルトプレフィックスが付かない() -> None:
 
     # Assert — description のみ表示、"デフォルト:" プレフィックスは付かない
     lines = md.split("\n")
-    data_line = next(line for line in lines if "end_date" in line)
+    data_line = next(line for line in lines if "発売終了日 |" in line)
     assert "発売終了日（未定の場合は 9999-12-31）" in data_line
     assert "デフォルト:" not in data_line
 
@@ -295,202 +318,81 @@ def test_テーブルなしでER図は空文字列() -> None:
 
 def test_単一テーブルのER図(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "users")
     table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
 
     # Act
     result = table_service.tables_to_er_diagram()
 
     # Assert
     assert result.startswith("erDiagram")
-    assert "users" in result
+    assert 'TABLE_0001["ユーザー"]' in result
 
 
 def test_複数テーブルのER図(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "users")
+    table_service.register_table("TABLE_0002", "orders")
     table_service.write_tsv("users", sample_tsv)
     table_service.write_tsv("orders", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
+    table_service.write_markdown("orders", "# 注文\n\n![[orders.tsv]]")
 
     # Act
     result = table_service.tables_to_er_diagram()
 
     # Assert
-    assert "users" in result
-    assert "orders" in result
+    assert 'TABLE_0001["ユーザー"]' in result
+    assert 'TABLE_0002["注文"]' in result
 
 
-def test_FK関係がER図に含まれる() -> None:
-    # Arrange — orders.user_id が users テーブルを参照する
-    users_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    )
-    orders_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "user_id\tUUID\tNO\tNO\tNO\t\t注文者\n"
-    )
-    table_service.write_tsv("users", users_tsv)
-    table_service.write_tsv("orders", orders_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert — users → orders のリレーションが含まれる
-    assert "users" in result
-    assert "orders" in result
-    assert "||--o{" in result
-
-
-def test_nullableなFKはオプショナル線になる() -> None:
-    # Arrange — orders.coupon_id が nullable で coupons を参照する
-    coupons_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    )
-    orders_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "coupon_id\tUUID\tYES\tNO\tNO\t\tクーポン\n"
-    )
-    table_service.write_tsv("coupons", coupons_tsv)
-    table_service.write_tsv("orders", orders_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert — nullable なので |o--o{ になる
-    assert "|o--o{" in result
-
-
-def test_参照先テーブルがなければリレーション線なし() -> None:
-    # Arrange — category_id があるが categories テーブルは存在しない
-    products_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "category_id\tUUID\tNO\tNO\tNO\t\tカテゴリ\n"
-    )
-    table_service.write_tsv("products", products_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert — 参照先がないのでリレーション線は出ない
-    assert "||--o{" not in result
-    assert "|o--o{" not in result
-
-
-def test_単数形テーブル名でFK一致() -> None:
-    # Arrange — items.order_id → order テーブル（単数形で一致）
-    order_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    )
-    items_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "order_id\tUUID\tNO\tNO\tNO\t\t注文\n"
-    )
-    table_service.write_tsv("order", order_tsv)
-    table_service.write_tsv("items", items_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert
-    assert "||--o{" in result
-
-
-def test_descriptionのテーブル参照でFK検出() -> None:
-    # Arrange — 「種類識別子」カラムの description に「商品種類テーブル」と記述
-    product_types_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    )
-    products_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "種類識別子\tUUID\tNO\tNO\tNO\t\t商品種類テーブルの識別子を参照\n"
-    )
-    table_service.write_tsv("商品種類", product_types_tsv)
-    table_service.write_tsv("プロダクト", products_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert — 商品種類 → プロダクト のリレーションが含まれる
-    assert "商品種類" in result
-    assert "プロダクト" in result
-    assert "||--o{" in result
-
-
-def test_表示名経由のテーブル参照でFK検出() -> None:
-    # Arrange — description に日本語表示名「商品種類テーブル」と記述、
-    #           ファイル名は英語 product_types
-    product_types_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    )
-    products_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "種類識別子\tUUID\tNO\tNO\tNO\t\t商品種類テーブルの識別子を参照\n"
-    )
-    table_service.write_tsv("product_types", product_types_tsv)
-    table_service.write_markdown("product_types", "# 商品種類\n\n![[product_types.tsv]]")
-    table_service.write_tsv("products", products_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert — 表示名経由で product_types → products のリレーションが検出される
-    assert "product_types" in result
-    assert "products" in result
-    assert "||--o{" in result
-
-
-def test_descriptionの参照先がなければリレーション線なし() -> None:
-    # Arrange — description に「注文テーブル」と書いてあるが注文テーブルは存在しない
-    products_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "種類識別子\tUUID\tNO\tNO\tNO\t\t注文テーブルの識別子\n"
-    )
-    table_service.write_tsv("プロダクト", products_tsv)
-
-    # Act
-    result = table_service.tables_to_er_diagram()
-
-    # Assert — 参照先テーブルがないのでリレーション線は出ない
-    assert "||--o{" not in result
-    assert "|o--o{" not in result
-
-
-def test_idサフィックスがdescription参照より優先() -> None:
-    # Arrange — _id サフィックスと description 両方でリレーションが検出可能な場合
-    #           _id サフィックスが優先される
-    users_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-    )
+def test_fk_target列でER図にリレーションが含まれる() -> None:
+    # Arrange — products.category_id が TABLE_0001 を参照する
     categories_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+        "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+        "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t\n"
     )
-    orders_tsv = (
-        "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-        "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        "user_id\tUUID\tNO\tNO\tNO\t\tcategoriesテーブルの参照\n"
+    products_tsv = (
+        "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+        "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t\n"
+        "COLUMN_0002\t商品種類\tcategory_id\tUUID\tNO\tNO\tNO\t\tTABLE_0001\t\n"
     )
-    table_service.write_tsv("users", users_tsv)
+    table_service.register_table("TABLE_0001", "categories")
+    table_service.register_table("TABLE_0002", "products")
     table_service.write_tsv("categories", categories_tsv)
-    table_service.write_tsv("orders", orders_tsv)
+    table_service.write_tsv("products", products_tsv)
 
     # Act
     result = table_service.tables_to_er_diagram()
 
-    # Assert — _id サフィックスで users に解決される（description の categories ではない）
-    assert 'users ||--o{ orders : ""' in result
-    assert "categories" not in result.split("\n")[-1]
+    # Assert — シンボル + alias 形式で出力、リレーション線がある
+    assert 'TABLE_0001["' in result
+    assert 'TABLE_0002["' in result
+    assert "TABLE_0001 ||--o{ TABLE_0002" in result
+
+
+def test_nullableなfk_targetはオプショナル線になる() -> None:
+    # Arrange
+    categories_tsv = (
+        "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+        "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t\n"
+    )
+    products_tsv = (
+        "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+        "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t\n"
+        "COLUMN_0002\t商品種類\tcategory_id\tUUID\tYES\tNO\tNO\t\tTABLE_0001\t\n"
+    )
+    table_service.register_table("TABLE_0001", "categories")
+    table_service.register_table("TABLE_0002", "products")
+    table_service.write_tsv("categories", categories_tsv)
+    table_service.write_tsv("products", products_tsv)
+
+    # Act
+    result = table_service.tables_to_er_diagram()
+
+    # Assert
+    assert "|o--o{" in result
 
 
 def test_テーブル一覧にindexは含まれない(sample_tsv: str) -> None:
@@ -580,7 +482,9 @@ def test_インデックスファイルがなければ空リスト() -> None:
 
 def test_ER図を読み込む(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "users")
     table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
     table_service.rebuild_index()
 
     # Act
@@ -588,7 +492,7 @@ def test_ER図を読み込む(sample_tsv: str) -> None:
 
     # Assert
     assert "erDiagram" in result
-    assert "users" in result
+    assert "TABLE_0001" in result
 
 
 def test_テーブルなしのER図は空文字列() -> None:
@@ -648,7 +552,9 @@ def test_テーブルなしでもテーブル一覧TSVが生成される() -> No
 
 def test_ER図再構築でmmdファイルが生成される(sample_tsv: str) -> None:
     # Arrange
+    table_service.register_table("TABLE_0001", "users")
     table_service.write_tsv("users", sample_tsv)
+    table_service.write_markdown("users", "# ユーザー\n\n![[users.tsv]]")
 
     # Act
     table_service.rebuild_er_diagram_file()
@@ -661,7 +567,7 @@ def test_ER図再構築でmmdファイルが生成される(sample_tsv: str) -> 
     assert not (d / "index.tsv").exists()
     result = table_service.read_er_diagram()
     assert "erDiagram" in result
-    assert "users" in result
+    assert "TABLE_0001" in result
 
 
 def test_テーブルなしでも空のmmdファイルが生成される() -> None:
@@ -711,7 +617,7 @@ def test_埋め込みTSVがMarkdownテーブルに展開される(sample_tsv: st
     # Assert — ![[users.tsv]] が markdown テーブルに展開される
     assert "![[users.tsv]]" not in result
     assert "| カラム名 |" in result
-    assert "| **id** |" in result
+    assert "| **識別子** |" in result
 
 
 def test_埋め込みなしのMarkdownはそのまま返る() -> None:

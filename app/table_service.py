@@ -347,7 +347,7 @@ def _tsv_to_generic_markdown(rows: list[dict[str, str]]) -> str:
 def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     """カラム定義の辞書リストを日本語ヘッダーの Markdown テーブルに変換する。
 
-    TSV の 7 列（column_name, type, nullable, pk, unique, default, description）を
+    TSV の列（logical_name, physical_name, type, nullable, pk, unique, fk_target, description）を
     表示用の 4 列（カラム名, 型, ユニーク, 説明）にマッピングする。
     型名は日本語に変換し、必須は * プレフィックス、PK は太字、FK は薄色で表現する。
     論理設計列（type）を持たない TSV は汎用テーブルとして出力する。
@@ -364,19 +364,15 @@ def tsv_to_markdown(rows: list[dict[str, str]]) -> str:
     if "type" not in rows[0]:
         return _tsv_to_generic_markdown(rows)
 
-    table_names = set(list_tables())
-    dn_map = _build_display_name_map(table_names)
-
     sep = ["---"] * len(_DISPLAY_HEADERS)
     lines = [
         "| " + " | ".join(_DISPLAY_HEADERS) + " |",
         "| " + " | ".join(sep) + " |",
     ]
     for row in rows:
-        col_name = row.get("column_name", "")
-        description = row.get("description", "")
+        col_name = row.get("logical_name") or row.get("physical_name", "")
 
-        is_fk = _resolve_fk_target(col_name, table_names, description, dn_map) is not None
+        is_fk = bool(row.get("fk_target", ""))
         is_pk = row.get("pk", "").upper() == "YES"
 
         if is_pk:
@@ -510,90 +506,42 @@ def read_er_diagram() -> str:
     return content
 
 
-def _build_display_name_map(table_names: set[str]) -> dict[str, str]:
-    """表示名からファイル名への逆引きマップを構築する。"""
-    mapping: dict[str, str] = {}
-    for name in table_names:
-        display = read_table_display_name(name)
-        if display != name:
-            mapping[display] = name
-    return mapping
-
-
-def _resolve_fk_target(
-    column_name: str,
-    table_names: set[str],
-    description: str = "",
-    display_name_map: dict[str, str] | None = None,
-) -> str | None:
-    """カラム名または description から参照先テーブルを推定する。
-
-    以下の順で判定し、最初にヒットしたテーブル名を返す:
-
-    1. ``_id`` サフィックス（例: ``user_id`` → ``user`` / ``users``）
-    2. description 中の「〇〇テーブル」表記（例: 「商品種類テーブルの識別子」→ ``product_types``）
-
-    Args:
-        column_name: カラム名（例: ``user_id``、``種類識別子``）。
-        table_names: 存在するテーブル名（ファイル名）のセット。
-        description: カラムの説明文。
-        display_name_map: 表示名→ファイル名の逆引きマップ。
-
-    Returns:
-        一致したテーブル名（ファイル名）。見つからなければ ``None``。
-    """
-    if column_name.endswith("_id"):
-        prefix = column_name[: -len("_id")]
-        for candidate in (prefix, f"{prefix}s"):
-            if candidate in table_names:
-                return candidate
-
-    match = re.search(r"(.+?)テーブル", description or "")
-    if match:
-        ref = match.group(1)
-        if ref in table_names:
-            return ref
-        if display_name_map and ref in display_name_map:
-            return display_name_map[ref]
-
-    return None
-
-
 def tables_to_er_diagram() -> str:
     """全テーブルの mermaid erDiagram テキストを生成する。
 
-    ``_id`` サフィックスのカラムから外部キー関係を推定し、リレーション線を描く。
-
-    Returns:
-        テーブルが 1 件以上あれば erDiagram テキスト。0 件なら空文字列。
+    TSV の fk_target 列からリレーション線を描く。
+    シンボル + mermaid alias 構文で表示名を付与する。
     """
     names = list_tables()
     if not names:
         return ""
 
-    name_set = set(names)
-    dn_map = _build_display_name_map(name_set)
+    display_map = get_symbol_display_map()
     lines = ["erDiagram"]
     relations: list[str] = []
 
     for name in names:
+        symbol = get_table_symbol(name)
+        if symbol is None:
+            continue
         try:
             rows = read_tsv(name)
         except FileNotFoundError:
             continue
         for row in rows:
-            target = _resolve_fk_target(
-                row.get("column_name", ""),
-                name_set,
-                row.get("description", ""),
-                dn_map,
-            )
-            if target is None or target == name:
+            target = row.get("fk_target", "")
+            if not target:
                 continue
             nullable = row.get("nullable", "NO").upper() == "YES"
             arrow = "|o--o{" if nullable else "||--o{"
-            relations.append(f'    {target} {arrow} {name} : ""')
+            relations.append(f'    {target} {arrow} {symbol} : ""')
 
-    lines.extend(f"    {name}" for name in names)
+    for name in names:
+        symbol = get_table_symbol(name)
+        if symbol is None:
+            continue
+        label = display_map.get(symbol, name)
+        lines.append(f'    {symbol}["{label}"]')
+
     lines.extend(relations)
     return "\n".join(lines)
