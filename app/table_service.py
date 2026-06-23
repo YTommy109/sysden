@@ -8,7 +8,18 @@ from app.config import get_data_dir
 
 logger = logging.getLogger(__name__)
 
-TSV_HEADERS = ["column_name", "type", "nullable", "pk", "unique", "default", "description"]
+TSV_HEADERS = [
+    "symbol",
+    "logical_name",
+    "physical_name",
+    "type",
+    "nullable",
+    "pk",
+    "unique",
+    "default",
+    "fk_target",
+    "description",
+]
 _INDEX_STEM = "index"
 _TABLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 

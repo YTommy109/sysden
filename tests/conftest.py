@@ -4,8 +4,8 @@ from types import SimpleNamespace
 import pytest
 
 SAMPLE_TSV = (
-    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
+    "symbol\tlogical_name\tphysical_name\ttype\tnullable\tpk\tunique\tdefault\tfk_target\tdescription\n"
+    "COLUMN_0001\t識別子\tid\tUUID\tNO\tYES\tYES\t\t\t主キー\n"
 )
 
 

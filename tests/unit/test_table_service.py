@@ -27,8 +27,9 @@ def test_TSVの書き込みと読み込み(sample_tsv: str) -> None:
     rows = table_service.read_tsv("users")
 
     # Assert
-    assert rows[0]["column_name"] == "id"
+    assert rows[0]["physical_name"] == "id"
     assert rows[0]["type"] == "UUID"
+    assert rows[0]["symbol"] == "COLUMN_0001"
 
 
 @pytest.mark.parametrize(
@@ -54,8 +55,8 @@ def test_TSVを生文字列で読み込む(sample_tsv: str) -> None:
     content = table_service.read_tsv_raw("users")
 
     # Assert
-    assert "column_name\t" in content
-    assert "id\tUUID" in content
+    assert "symbol\t" in content
+    assert "COLUMN_0001\t" in content
 
 
 def test_テーブルを削除する(sample_tsv: str) -> None:
