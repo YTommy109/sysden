@@ -3,14 +3,30 @@ from types import SimpleNamespace
 
 import pytest
 
-SAMPLE_TSV = (
-    "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-    "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-)
+SAMPLE_TOON = """\
+meta:
+  symbol: TABLE_0001
+  logical_name: ユーザー
+  physical_name: users
+  description: テスト用テーブル
+
+columns[1]{symbol,logical_name,physical_name,type,nullable,pk,unique,default,fk_target,description}:
+  COLUMN_0001,識別子,id,uuid,NO,YES,YES,,,主キー
+"""
+
+SAMPLE_CORE_TOON = """\
+meta:
+  logical_name: スタブ
+  physical_name: stub_table
+  description: テスト用テーブル
+
+columns[1]{symbol,logical_name,physical_name,type,nullable,pk,unique,default,fk_target,description}:
+  COLUMN_0001,識別子,id,uuid,NO,YES,YES,gen_random_uuid(),,主キー
+"""
 
 
 def make_fake_openai_client(
-    tsv: str = SAMPLE_TSV,
+    response: str = SAMPLE_CORE_TOON,
     calls: list[dict] | None = None,
 ) -> SimpleNamespace:
     """OpenAI API 構造を模倣するスタブクライアントを生成する。"""
@@ -18,7 +34,7 @@ def make_fake_openai_client(
     def create(**kwargs: object) -> SimpleNamespace:
         if calls is not None:
             calls.append(kwargs)
-        choice = SimpleNamespace(message=SimpleNamespace(content=tsv))
+        choice = SimpleNamespace(message=SimpleNamespace(content=response))
         return SimpleNamespace(choices=[choice])
 
     completions = SimpleNamespace(create=create)
@@ -26,9 +42,9 @@ def make_fake_openai_client(
 
 
 @pytest.fixture()
-def sample_tsv() -> str:
-    """テスト用の最小限カラム定義 TSV。"""
-    return SAMPLE_TSV
+def sample_toon() -> str:
+    """テスト用の最小限テーブル TOON。"""
+    return SAMPLE_TOON
 
 
 @pytest.fixture(autouse=True)
