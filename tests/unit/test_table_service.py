@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from app import table_service
+from app import derive_service, table_service
 from app.models import Column, TableMeta, ToonDocument
 from app.toon_io import parse_table_toon
 
@@ -62,7 +62,7 @@ def test_論理設計で型名が日本語に変換される(sql_type: str, expe
     col = _make_column(type=sql_type, logical_name="テスト")
 
     # Act
-    result = table_service.derive_logical([col])
+    result = derive_service.derive_logical([col])
 
     # Assert
     assert result[0]["型"] == expected
@@ -82,7 +82,7 @@ def test_論理設計でnullableに応じてアスタリスクが付く(
     col = _make_column(logical_name=logical_name, type="varchar(100)", nullable=nullable)
 
     # Act
-    result = table_service.derive_logical([col])
+    result = derive_service.derive_logical([col])
 
     # Assert
     assert result[0]["カラム名"] == expected
@@ -94,7 +94,7 @@ def test_論理設計でユニークフラグが変換される() -> None:
     col_no = _make_column(unique="NO")
 
     # Act
-    result = table_service.derive_logical([col_yes, col_no])
+    result = derive_service.derive_logical([col_yes, col_no])
 
     # Assert
     assert result[0]["ユニーク"] == "○"
@@ -114,7 +114,7 @@ def test_物理設計でphysical_nameが使われる() -> None:
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_physical(doc)
+    result = derive_service.derive_physical(doc)
 
     # Assert — index 0 is surrogate key "id", index 1 is the column
     assert result[1]["column_name"] == "product_id"
@@ -135,7 +135,7 @@ def test_物理設計で全フィールドが含まれる() -> None:
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_physical(doc)
+    result = derive_service.derive_physical(doc)
 
     # Assert — index 1 is the column (index 0 is surrogate key)
     row = result[1]
@@ -152,7 +152,7 @@ def test_物理設計でサロゲートキーと操作記録が付与される()
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_physical(doc)
+    result = derive_service.derive_physical(doc)
 
     # Assert
     assert result[0]["column_name"] == "id"
@@ -186,7 +186,7 @@ def test_DAOでSQL型がPython型に変換される(sql_type: str, expected_pyth
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_dao(doc)
+    result = derive_service.derive_dao(doc)
 
     # Assert — index 0 is surrogate key "id", index 1 is the column
     assert result[1]["python_type"] == expected_python_type
@@ -198,7 +198,7 @@ def test_DAOでvarcharのmax_lengthが抽出される() -> None:
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_dao(doc)
+    result = derive_service.derive_dao(doc)
 
     # Assert — index 1 is the column
     assert result[1]["max_length"] == "100"
@@ -211,7 +211,7 @@ def test_DAOでnullableがrequiredに変換される() -> None:
     doc = _make_doc(col_required, col_optional)
 
     # Act
-    result = table_service.derive_dao(doc)
+    result = derive_service.derive_dao(doc)
 
     # Assert — index 0 is surrogate key, indices 1 and 2 are the columns
     assert result[1]["required"] == "YES"
@@ -224,7 +224,7 @@ def test_DAOでサロゲートキーと操作記録が付与される() -> None:
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_dao(doc)
+    result = derive_service.derive_dao(doc)
 
     # Assert
     assert result[0]["column_name"] == "id"
@@ -239,7 +239,7 @@ def test_derive_allで3セクションが追加される() -> None:
     doc = parse_table_toon(SAMPLE_TOON)
 
     # Act
-    result = table_service.derive_all(doc)
+    result = derive_service.derive_all(doc)
 
     # Assert — 1 user column + 1 surrogate key + 3 operation timestamps = 5
     assert result.logical is not None

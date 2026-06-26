@@ -18,9 +18,9 @@
     _="on click add .active to me remove .active from .tab in .tabs then hide #logical hide #physical show #dao">DAO</button>
 </div>
 
-<div id="logical">{{ logical_html | safe }}</div>
-<div id="physical" style="display:none;">{{ physical_html | safe }}</div>
-<div id="dao" style="display:none;">{{ dao_html | safe }}</div>
+<div id="logical">{{ logical | logical_table_html | safe }}</div>
+<div id="physical" style="display:none;">{{ physical | dict_table_html | safe }}</div>
+<div id="dao" style="display:none;">{{ dao | dict_table_html | safe }}</div>
 
 <h2>AI に更新を依頼</h2>
 <form method="post" action="/api/tables/{{ name }}"

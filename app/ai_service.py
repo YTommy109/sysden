@@ -29,6 +29,14 @@ def _load_prompts() -> dict:
 
 
 def get_client() -> OpenAI:
+    """OpenAI クライアントを生成する。
+
+    Returns:
+        設定済みの OpenAI クライアント。
+
+    Raises:
+        ValueError: OPENAI_API_KEY が未設定の場合。
+    """
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY が設定されていません")
@@ -44,23 +52,23 @@ def _format_existing_tables(tables: list[TableSummary]) -> str:
     return "\n".join(lines)
 
 
-def create_table_design(
-    prompt: str,
-    rules: list[str],
-    existing_tables: list[TableSummary],
-) -> list[ToonDocument]:
-    if os.environ.get("SYSDEN_TEST_MODE") == "1":
-        logger.info("AI コア設計生成スキップ (テストモード)")
-        return [parse_table_toon(_STUB_CORE_TOON)]
+def _format_rules(rules: list[str]) -> str:
+    return "\n".join(f"- {r}" for r in rules) if rules else "なし"
 
-    logger.info("AI コア設計生成開始: prompt_length=%d", len(prompt))
-    config = _load_prompts()["core_create"]
-    user_message = config["user_template"].format(
-        rules="\n".join(f"- {r}" for r in rules) if rules else "なし",
-        existing_tables=_format_existing_tables(existing_tables),
-        prompt=prompt,
-    )
 
+def _call_openai(config_key: str, template_vars: dict[str, str], log_label: str) -> str:
+    """OpenAI API を呼び出して応答テキストを返す。
+
+    Args:
+        config_key: ``ai_prompts.yaml`` 内のプロンプト設定キー。
+        template_vars: ユーザーメッセージテンプレートに渡す変数。
+        log_label: ログ出力に使う操作ラベル。
+
+    Returns:
+        API レスポンスのテキスト。
+    """
+    config = _load_prompts()[config_key]
+    user_message = config["user_template"].format(**template_vars)
     client = get_client()
     try:
         response = client.chat.completions.create(
@@ -72,11 +80,43 @@ def create_table_design(
             temperature=config["temperature"],
         )
     except Exception:
-        logger.exception("AI コア設計生成失敗")
+        logger.exception("%s失敗", log_label)
         raise
-    content = response.choices[0].message.content or ""
+    return response.choices[0].message.content or ""
+
+
+def create_table_design(
+    prompt: str,
+    rules: list[str],
+    existing_tables: list[TableSummary],
+) -> list[ToonDocument]:
+    """AI にコア設計（TOON）を新規生成させる。
+
+    Args:
+        prompt: ユーザーからの依頼テキスト。
+        rules: 共通ルール一覧。
+        existing_tables: 既存テーブルの要約リスト。
+
+    Returns:
+        生成された ToonDocument のリスト。
+    """
+    if os.environ.get("SYSDEN_TEST_MODE") == "1":
+        logger.info("AI コア設計生成スキップ (テストモード)")
+        return [parse_table_toon(_STUB_CORE_TOON)]
+
+    log_label = "AI コア設計生成"
+    logger.info("%s開始: prompt_length=%d", log_label, len(prompt))
+    content = _call_openai(
+        "core_create",
+        {
+            "rules": _format_rules(rules),
+            "existing_tables": _format_existing_tables(existing_tables),
+            "prompt": prompt,
+        },
+        log_label,
+    )
     tables = parse_toon_tables(content)
-    logger.info("AI コア設計生成完了: tables=%d", len(tables))
+    logger.info("%s完了: tables=%d", log_label, len(tables))
     return tables
 
 
@@ -86,33 +126,33 @@ def update_table_design(
     rules: list[str],
     existing_tables: list[TableSummary],
 ) -> ToonDocument:
+    """AI にコア設計（TOON）を更新させる。
+
+    Args:
+        prompt: ユーザーからの変更依頼テキスト。
+        current: 更新対象の現在の ToonDocument。
+        rules: 共通ルール一覧。
+        existing_tables: 既存テーブルの要約リスト。
+
+    Returns:
+        更新された ToonDocument。
+    """
     if os.environ.get("SYSDEN_TEST_MODE") == "1":
         logger.info("AI コア設計更新スキップ (テストモード)")
         return parse_table_toon(_STUB_CORE_TOON)
 
-    logger.info("AI コア設計更新開始: table=%s", current.meta.physical_name)
-    config = _load_prompts()["core_update"]
-    user_message = config["user_template"].format(
-        current_core=serialize_table_toon(current),
-        rules="\n".join(f"- {r}" for r in rules) if rules else "なし",
-        existing_tables=_format_existing_tables(existing_tables),
-        prompt=prompt,
+    log_label = f"AI コア設計更新: table={current.meta.physical_name}"
+    logger.info("%s開始", log_label)
+    content = _call_openai(
+        "core_update",
+        {
+            "current_core": serialize_table_toon(current),
+            "rules": _format_rules(rules),
+            "existing_tables": _format_existing_tables(existing_tables),
+            "prompt": prompt,
+        },
+        log_label,
     )
-
-    client = get_client()
-    try:
-        response = client.chat.completions.create(
-            model=config["model"],
-            messages=[
-                {"role": "system", "content": config["system"]},
-                {"role": "user", "content": user_message},
-            ],
-            temperature=config["temperature"],
-        )
-    except Exception:
-        logger.exception("AI コア設計更新失敗: table=%s", current.meta.physical_name)
-        raise
-    content = response.choices[0].message.content or ""
     result = parse_table_toon(content)
-    logger.info("AI コア設計更新完了: table=%s", current.meta.physical_name)
+    logger.info("%s完了", log_label)
     return result

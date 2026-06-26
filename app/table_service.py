@@ -1,8 +1,10 @@
 import logging
 import re
 
+from app import ai_service, symbol_service
 from app.config import get_data_dir
-from app.models import Column, TableSummary, ToonDocument
+from app.derive_service import derive_all
+from app.models import IndexDocument, TableSummary, ToonDocument
 from app.toon_io import (
     read_index_toon,
     read_toon,
@@ -13,217 +15,93 @@ from app.toon_io import (
 logger = logging.getLogger(__name__)
 
 _TABLE_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-_TYPE_PARAM_RE = re.compile(r"^([a-z]+)(\(.+\))$", re.IGNORECASE)
-
-_TYPE_MAP: dict[str, str] = {
-    "uuid": "UUID",
-    "varchar": "文字列",
-    "integer": "整数",
-    "int": "整数",
-    "bigint": "整数",
-    "smallint": "整数",
-    "decimal": "固定小数点数",
-    "text": "テキスト",
-    "boolean": "真偽値",
-    "date": "日付",
-    "timestamp": "日時",
-    "timestamptz": "日時",
-}
-
-_PYTHON_TYPE_MAP: dict[str, str] = {
-    "uuid": "UUID",
-    "varchar": "str",
-    "text": "str",
-    "integer": "int",
-    "int": "int",
-    "bigint": "int",
-    "smallint": "int",
-    "boolean": "bool",
-    "decimal": "Decimal",
-    "date": "date",
-    "timestamp": "datetime",
-    "timestamptz": "datetime",
-}
 
 
 def validate_table_name(name: str) -> bool:
+    """テーブル名が命名規約に適合するか検証する。
+
+    Args:
+        name: 検証するテーブル名。
+
+    Returns:
+        ``^[a-z][a-z0-9_]{0,63}$`` に適合すれば True。
+    """
     return _TABLE_NAME_RE.fullmatch(name) is not None
 
 
-def _split_type(sql_type: str) -> tuple[str, str]:
-    m = _TYPE_PARAM_RE.match(sql_type)
-    if m:
-        return m.group(1).lower(), m.group(2)
-    return sql_type.lower(), ""
+def _require_valid_name(name: str) -> None:
+    if not validate_table_name(name):
+        raise ValueError(f"Invalid table name: '{name}'")
 
 
-def derive_logical(columns: list[Column]) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
-    for col in columns:
-        base, params = _split_type(col.type)
-        jp_type = _TYPE_MAP.get(base, col.type) + params
-        name = f"* {col.logical_name}" if col.nullable == "NO" else col.logical_name
-        rows.append(
-            {
-                "カラム名": name,
-                "型": jp_type,
-                "ユニーク": "○" if col.unique.upper() == "YES" else "",
-                "説明": col.description,
-            }
-        )
-    return rows
+def get_index() -> IndexDocument:
+    """インデックスドキュメントを取得する。
 
-
-def derive_physical(doc: ToonDocument) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = [
-        {
-            "column_name": "id",
-            "type": "uuid",
-            "nullable": "NO",
-            "pk": "YES",
-            "unique": "YES",
-            "default": "uuidv7()",
-            "description": "サロゲートキー",
-        },
-    ]
-    for col in doc.columns:
-        rows.append(
-            {
-                "column_name": col.physical_name,
-                "type": col.type,
-                "nullable": col.nullable,
-                "pk": col.pk,
-                "unique": col.unique,
-                "default": col.default,
-                "description": col.description,
-            }
-        )
-    rows.extend(
-        [
-            {
-                "column_name": "created_at",
-                "type": "timestamptz",
-                "nullable": "NO",
-                "pk": "NO",
-                "unique": "NO",
-                "default": "now()",
-                "description": "作成日時",
-            },
-            {
-                "column_name": "updated_at",
-                "type": "timestamptz",
-                "nullable": "NO",
-                "pk": "NO",
-                "unique": "NO",
-                "default": "now()",
-                "description": "更新日時",
-            },
-            {
-                "column_name": "disabled_at",
-                "type": "timestamptz",
-                "nullable": "YES",
-                "pk": "NO",
-                "unique": "NO",
-                "default": "NONE",
-                "description": "無効化日時",
-            },
-        ]
-    )
-    return rows
-
-
-def derive_dao(doc: ToonDocument) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = [
-        {
-            "column_name": "id",
-            "python_type": "UUID",
-            "required": "YES",
-            "min": "",
-            "max": "",
-            "max_length": "",
-            "description": "サロゲートキー",
-        },
-    ]
-    for col in doc.columns:
-        base, params = _split_type(col.type)
-        python_type = _PYTHON_TYPE_MAP.get(base, base)
-        max_length = ""
-        if base == "varchar" and params:
-            max_length = params.strip("()")
-        rows.append(
-            {
-                "column_name": col.physical_name,
-                "python_type": python_type,
-                "required": "NO" if col.nullable.upper() == "YES" else "YES",
-                "min": "",
-                "max": "",
-                "max_length": max_length,
-                "description": col.description,
-            }
-        )
-    rows.extend(
-        [
-            {
-                "column_name": "created_at",
-                "python_type": "datetime",
-                "required": "YES",
-                "min": "",
-                "max": "",
-                "max_length": "",
-                "description": "作成日時",
-            },
-            {
-                "column_name": "updated_at",
-                "python_type": "datetime",
-                "required": "YES",
-                "min": "",
-                "max": "",
-                "max_length": "",
-                "description": "更新日時",
-            },
-            {
-                "column_name": "disabled_at",
-                "python_type": "datetime",
-                "required": "NO",
-                "min": "",
-                "max": "",
-                "max_length": "",
-                "description": "無効化日時",
-            },
-        ]
-    )
-    return rows
-
-
-def derive_all(doc: ToonDocument) -> ToonDocument:
-    return doc.model_copy(
-        update={
-            "logical": derive_logical(doc.columns),
-            "physical": derive_physical(doc),
-            "dao": derive_dao(doc),
-        }
-    )
+    Returns:
+        IndexDocument（テーブル一覧・ルール・ER 図を含む）。
+    """
+    return read_index_toon()
 
 
 def table_exists(name: str) -> bool:
+    """指定テーブルの TOON ファイルが存在するか判定する。
+
+    Args:
+        name: テーブル名。
+
+    Returns:
+        ファイルが存在すれば True。
+    """
     return (get_data_dir() / f"{name}.toon").exists()
 
 
 def list_tables() -> list[TableSummary]:
+    """インデックスからテーブル要約一覧を取得する。
+
+    Returns:
+        TableSummary のリスト。
+    """
     index = read_index_toon()
     return index.tables
 
 
 def get_table(name: str) -> ToonDocument:
+    """テーブルの TOON ドキュメントを読み込む。
+
+    Args:
+        name: テーブル名。
+
+    Returns:
+        読み込んだ ToonDocument。
+
+    Raises:
+        FileNotFoundError: 指定テーブルが存在しない場合。
+    """
     return read_toon(name)
 
 
 def save_table(name: str, doc: ToonDocument) -> None:
+    """テーブルの TOON ドキュメントをファイルに保存する。
+
+    Args:
+        name: テーブル名。
+        doc: 保存する ToonDocument。
+    """
     write_toon(name, doc)
     logger.info("テーブル保存: table=%s", name)
 
 
 def delete_table(name: str) -> None:
+    """テーブルの TOON ファイルを削除する。
+
+    Args:
+        name: テーブル名。
+
+    Raises:
+        ValueError: テーブル名が不正な場合。
+        FileNotFoundError: 指定テーブルが存在しない場合。
+    """
+    _require_valid_name(name)
     path = get_data_dir() / f"{name}.toon"
     if not path.exists():
         logger.warning("テーブル削除失敗: table=%s (存在しない)", name)
@@ -233,6 +111,16 @@ def delete_table(name: str) -> None:
 
 
 def generate_er_diagram(tables: list[TableSummary] | None = None) -> str:
+    """テーブル一覧から Mermaid ER 図を生成する。
+
+    FK 参照からリレーションを自動検出する。
+
+    Args:
+        tables: テーブル要約リスト。None の場合はインデックスから取得する。
+
+    Returns:
+        Mermaid ER 図文字列。テーブルがなければ空文字列。
+    """
     if tables is None:
         index = read_index_toon()
         tables = index.tables
@@ -261,6 +149,7 @@ def generate_er_diagram(tables: list[TableSummary] | None = None) -> str:
 
 
 def rebuild_index() -> None:
+    """全 TOON ファイルを走査してインデックスと ER 図を再構築する。"""
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     names = sorted(f.stem for f in d.glob("*.toon") if f.stem != "index")
@@ -283,3 +172,85 @@ def rebuild_index() -> None:
     updated = index.model_copy(update={"tables": tables, "er_diagram": er})
     write_index_toon(updated)
     logger.info("インデックス再構築完了")
+
+
+def create_tables_from_ai(prompt: str) -> list[str]:
+    """AI にテーブル設計を依頼し、検証・保存してテーブル名を返す。
+
+    シンボル採番・FK プレースホルダ置換・導出を行い、
+    途中失敗時は作成済みファイルをロールバックする。
+
+    Args:
+        prompt: ユーザーからの依頼テキスト。
+
+    Returns:
+        作成されたテーブル名のリスト。
+
+    Raises:
+        ValueError: AI が生成したテーブル名が不正な場合。
+        FileExistsError: 同名テーブルが既に存在する場合。
+    """
+    index = read_index_toon()
+    designs = ai_service.create_table_design(
+        prompt=prompt,
+        rules=index.rules,
+        existing_tables=index.tables,
+    )
+
+    for doc in designs:
+        _require_valid_name(doc.meta.physical_name)
+        if table_exists(doc.meta.physical_name):
+            raise FileExistsError(f"Table '{doc.meta.physical_name}' already exists")
+
+    table_symbols = [symbol_service.allocate_table_symbol() for _ in designs]
+    placeholder_map: dict[str, str] = {}
+    for i, _doc in enumerate(designs):
+        placeholder_map[f"NEW_{i + 1}"] = table_symbols[i]
+    designs = symbol_service.remap_placeholders(
+        designs, placeholder_map, table_symbols=table_symbols
+    )
+
+    written: list[str] = []
+    try:
+        for doc in designs:
+            doc = derive_all(doc)
+            name = doc.meta.physical_name
+            save_table(name, doc)
+            written.append(name)
+    except Exception:
+        for name in written:
+            delete_table(name)
+        raise
+    rebuild_index()
+    names = [d.meta.physical_name for d in designs]
+    logger.info("テーブル作成完了: tables=%s", names)
+    return names
+
+
+def update_table_from_ai(name: str, prompt: str) -> None:
+    """AI に既存テーブルの設計更新を依頼し、保存する。
+
+    Args:
+        name: 更新対象のテーブル名。
+        prompt: ユーザーからの変更依頼テキスト。
+
+    Raises:
+        ValueError: テーブル名が不正な場合。
+        FileNotFoundError: テーブルが存在しない場合。
+    """
+    _require_valid_name(name)
+    current = get_table(name)
+    index = read_index_toon()
+    updated = ai_service.update_table_design(
+        prompt=prompt,
+        current=current,
+        rules=index.rules,
+        existing_tables=index.tables,
+    )
+    updated = updated.model_copy(
+        update={"meta": updated.meta.model_copy(update={"symbol": current.meta.symbol})}
+    )
+    updated = derive_all(updated)
+    save_table(name, updated)
+    rebuild_index()
+    logger.info("テーブル更新完了: table=%s", name)
