@@ -4,6 +4,9 @@ from collections.abc import Callable
 
 from playwright.sync_api import Page, expect
 
+_TABLE_NAME = "stub_table"
+_TABLE_DISPLAY = "スタブ"
+
 
 class TestEndToEndFlow:
     """ユーザーの典型的な操作フロー。"""
@@ -20,19 +23,20 @@ class TestEndToEndFlow:
 
         # Then: 詳細ページにリダイレクトされる
         page.wait_for_url("**/tables/*")
-        table_name = page.locator("h1").inner_text()
+        expect(page.locator("h1")).to_be_visible()
 
         # When: 戻るアイコンで一覧に戻る
         page.click('a[href="/"][aria-label="一覧に戻る"]')
         page.wait_for_url(f"{base_url}/")
 
         # Then: 作成したテーブルの行が表示される
-        row = page.locator("#table-list tbody tr", has_text=table_name)
-        expect(row).to_be_visible()
+        expect(page.locator("#table-list tbody tr").first).to_be_visible()
+        table_row = page.locator("#table-list tbody tr").first
 
         # When: 削除ボタン → ダイアログで受け入れる
+        table_name = table_row.locator("a").first.inner_text()
         page.on("dialog", lambda d: d.accept())
-        row.locator("button", has_text="削除").click()
+        table_row.locator("button", has_text="削除").click()
 
         # Then: 行が消える
         expect(page.locator("#table-list tbody tr", has_text=table_name)).not_to_be_visible()
@@ -56,22 +60,22 @@ class TestEndToEndFlow:
         page.fill('textarea[name="prompt"]', "ステータスカラムを追加して")
         page.click('button[type="submit"]')
 
-        # Then: 同じ詳細ページに留まり、テーブルが表示される
+        # Then: 同じ詳細ページに留まり、タブが表示される
         page.wait_for_url(detail_url)
         expect(page.locator("h1")).to_be_visible()
-        expect(page.locator("#table-view table")).to_be_visible()
+        expect(page.locator(".tabs")).to_be_visible()
 
     def test_一覧から詳細へのリンク遷移(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
-        # When: トップページで "詳細" リンクをクリックする
+        # When: トップページでテーブル名リンクをクリックする
         page.goto(base_url)
-        page.click('#table-list a[href="/tables/users"]')
+        page.click(f'#table-list a[href="/tables/{_TABLE_NAME}"]')
 
         # Then: 詳細ページに遷移する
-        page.wait_for_url("**/tables/users")
-        expect(page.locator("h1")).to_have_text("users")
-        expect(page.locator("#table-view table")).to_be_visible()
+        page.wait_for_url(f"**/{_TABLE_NAME}")
+        expect(page.locator("h1")).to_have_text(_TABLE_DISPLAY)
+        expect(page.locator(".tabs")).to_be_visible()

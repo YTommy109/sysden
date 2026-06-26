@@ -6,8 +6,8 @@ from typing import Annotated
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response, StreamingResponse
 
-from app import ai_service, table_service
-from app.config import get_data_dir
+from app import ai_service, symbol_service, table_service
+from app.toon_io import read_index_toon
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +16,7 @@ router = APIRouter(prefix="/api")
 
 def _check_table_name(name: str) -> None:
     if not table_service.validate_table_name(name):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid table name: '{name}'",
-        )
+        raise HTTPException(status_code=422, detail=f"Invalid table name: '{name}'")
 
 
 def _rebuilding_response(sse_url: str, target: str, label: str) -> HTMLResponse:
@@ -40,39 +37,49 @@ def _rebuilding_response(sse_url: str, target: str, label: str) -> HTMLResponse:
 def create_table(
     request: Request,
     prompt: Annotated[str, Form()],
-    name: Annotated[str | None, Form()] = None,
 ) -> Response:
-    """AI にテーブル設計を生成させ、ファイルに書き込む。
+    logger.info("テーブル作成リクエスト: prompt_length=%d", len(prompt))
+    index = read_index_toon()
+    designs = ai_service.create_table_design(
+        prompt=prompt,
+        rules=index.rules,
+        existing_tables=index.tables,
+    )
 
-    名前指定時は単一テーブル、未指定時は AI がテーブル名も決定する。
-    複数テーブル生成時、途中で失敗したら作成済みファイルをロールバックする。
-    """
-    logger.info("テーブル作成リクエスト: name=%s prompt_length=%d", name, len(prompt))
-    if name is None:
-        tables = ai_service.create_table_design(prompt)
-    else:
-        _check_table_name(name)
-        tsv = ai_service.generate_table_design(prompt)
-        default_md = f"# {name}\n\n## 概要\n\n## テーブル設計\n\n![[{name}.tsv]]\n"
-        tables = [(name, tsv, default_md)]
-    for tbl_name, _, _ in tables:
-        _check_table_name(tbl_name)
-        if table_service.table_exists(tbl_name):
-            raise HTTPException(status_code=409, detail=f"Table '{tbl_name}' already exists")
+    for doc in designs:
+        _check_table_name(doc.meta.physical_name)
+        if table_service.table_exists(doc.meta.physical_name):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Table '{doc.meta.physical_name}' already exists",
+            )
+
+    table_symbols = [symbol_service.allocate_table_symbol() for _ in designs]
+    placeholder_map: dict[str, str] = {}
+    for i, _doc in enumerate(designs):
+        placeholder = f"NEW_{i + 1}"
+        placeholder_map[placeholder] = table_symbols[i]
+    designs = symbol_service.remap_placeholders(
+        designs, placeholder_map, table_symbols=table_symbols
+    )
+
     written: list[str] = []
     try:
-        for tbl_name, tbl_tsv, tbl_md in tables:
-            table_service.write_tsv(tbl_name, tbl_tsv)
-            written.append(tbl_name)
-            if tbl_md:
-                table_service.write_markdown(tbl_name, tbl_md)
+        for doc in designs:
+            doc = table_service.derive_all(doc)
+            name = doc.meta.physical_name
+            table_service.save_table(name, doc)
+            written.append(name)
     except Exception:
-        for written_name in written:
-            table_service.delete_table(written_name)
+        for name in written:
+            table_service.delete_table(name)
         raise
     table_service.rebuild_index()
-    logger.info("テーブル作成完了: tables=%s", [t[0] for t in tables])
-    redirect_url = f"/tables/{tables[0][0]}" if len(tables) == 1 else "/"
+    logger.info(
+        "テーブル作成完了: tables=%s",
+        [d.meta.physical_name for d in designs],
+    )
+    redirect_url = f"/tables/{designs[0].meta.physical_name}" if len(designs) == 1 else "/"
     if request.headers.get("HX-Request"):
         return Response(headers={"HX-Redirect": redirect_url})
     return RedirectResponse(url=redirect_url, status_code=303)
@@ -84,15 +91,26 @@ def update_table(
     request: Request,
     prompt: Annotated[str, Form()],
 ) -> Response:
-    """既存テーブルの定義を AI に更新させる。"""
-    logger.info("テーブル更新リクエスト: table=%s prompt_length=%d", name, len(prompt))
+    logger.info("テーブル更新リクエスト: table=%s", name)
     _check_table_name(name)
     try:
-        current_tsv = table_service.read_tsv_raw(name)
+        current = table_service.get_table(name)
     except FileNotFoundError as err:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
-    tsv = ai_service.generate_table_design(prompt, current_tsv)
-    table_service.write_tsv(name, tsv)
+        raise HTTPException(status_code=404, detail=str(err)) from err
+
+    index = read_index_toon()
+    updated = ai_service.update_table_design(
+        prompt=prompt,
+        current=current,
+        rules=index.rules,
+        existing_tables=index.tables,
+    )
+    updated = updated.model_copy(
+        update={"meta": updated.meta.model_copy(update={"symbol": current.meta.symbol})}
+    )
+    updated = table_service.derive_all(updated)
+    table_service.save_table(name, updated)
+    table_service.rebuild_index()
     logger.info("テーブル更新完了: table=%s", name)
     redirect_url = f"/tables/{name}"
     if request.headers.get("HX-Request"):
@@ -102,7 +120,6 @@ def update_table(
 
 @router.post("/rebuild-index-tables")
 def rebuild_index_tables(request: Request) -> Response:
-    """テーブル一覧 (index.tsv) と ER 図 (index.mmd) を再生成してトップページへリダイレクトする。"""
     if request.headers.get("HX-Request"):
         return _rebuilding_response("/api/sse/rebuild-index", "#index-body", "テーブル一覧の再作成")
     table_service.rebuild_index()
@@ -111,56 +128,19 @@ def rebuild_index_tables(request: Request) -> Response:
 
 @router.post("/rebuild-er-diagram")
 def rebuild_er_diagram(request: Request) -> Response:
-    """ER 図 (index.mmd) を再生成してトップページへリダイレクトする。"""
     if request.headers.get("HX-Request"):
         return _rebuilding_response("/api/sse/rebuild-er", "#er-diagram", "ER 図の再作成")
-    table_service.rebuild_er_diagram_file()
+    table_service.rebuild_index()
     return RedirectResponse(url="/", status_code=303)
-
-
-@router.post("/tables/{name}/physical")
-def generate_physical(name: str, request: Request) -> Response:
-    """論理設計から物理設計を AI に生成させる。"""
-    logger.info("物理設計生成リクエスト: table=%s", name)
-    _check_table_name(name)
-    try:
-        logical_tsv = table_service.read_tsv_raw(name)
-    except FileNotFoundError as err:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
-
-    logical_md = table_service.read_markdown(name) or ""
-
-    common_rules: str | None = None
-    index_md_path = get_data_dir() / "index.md"
-    if index_md_path.exists():
-        common_rules = index_md_path.read_text(encoding="utf-8")
-
-    physical_md, physical_tsv, physical_doa = ai_service.generate_physical_design(
-        name=name,
-        logical_md=logical_md,
-        logical_tsv=logical_tsv,
-        common_rules=common_rules,
-    )
-
-    table_service.write_physical_tsv(name, physical_tsv)
-    table_service.write_physical_doa_tsv(name, physical_doa)
-    table_service.write_physical_markdown(name, physical_md)
-
-    logger.info("物理設計生成完了: table=%s", name)
-    redirect_url = f"/tables/{name}/physical"
-    if request.headers.get("HX-Request"):
-        return Response(headers={"HX-Redirect": redirect_url})
-    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 @router.delete("/tables/{name}")
 def delete_table(name: str) -> dict[str, str]:
-    """テーブルの TSV と markdown を削除し、インデックスを再構築する。"""
     _check_table_name(name)
     try:
         table_service.delete_table(name)
     except FileNotFoundError as err:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
+        raise HTTPException(status_code=404, detail=str(err)) from err
     table_service.rebuild_index()
     logger.info("テーブル削除完了: table=%s", name)
     return {"status": "deleted", "name": name}
@@ -191,11 +171,9 @@ async def _sse_rebuild(func: Callable[[], object]) -> StreamingResponse:
 
 @router.get("/sse/rebuild-index")
 async def sse_rebuild_index() -> StreamingResponse:
-    """テーブル一覧再構築の SSE エンドポイント。"""
     return await _sse_rebuild(table_service.rebuild_index)
 
 
 @router.get("/sse/rebuild-er")
 async def sse_rebuild_er() -> StreamingResponse:
-    """ER 図再構築の SSE エンドポイント。"""
-    return await _sse_rebuild(table_service.rebuild_er_diagram_file)
+    return await _sse_rebuild(table_service.rebuild_index)

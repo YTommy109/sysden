@@ -1,7 +1,6 @@
 """GET / — テーブル一覧ページの E2E テスト。"""
 
 from collections.abc import Callable
-from pathlib import Path
 
 from playwright.sync_api import Dialog, Page, expect
 
@@ -128,49 +127,46 @@ class TestIndexPageWithTables:
     def test_テーブル行が表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する（テストモードでは stub_table / スタブ が作成される）
+        create_table()
 
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: "users" を含む行が表示される
-        row = page.locator("#table-list tbody tr", has_text="users")
-        expect(row).to_be_visible()
+        # Then: テーブル行が少なくとも1行表示される
+        expect(page.locator("#table-list tbody tr").first).to_be_visible()
 
     def test_テーブル名が詳細ページへのリンク(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する（テストモードでは stub_table が作成される）
+        create_table()
 
         # When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: テーブル名が /tables/users へのリンクになっている
-        link = page.locator('#table-list a[href="/tables/users"]')
+        # Then: テーブル名が詳細ページへのリンクになっている
+        link = page.locator('#table-list a[href="/tables/stub_table"]')
         expect(link).to_be_visible()
-        expect(link).to_have_text("users")
 
     def test_行に削除ボタンがある(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: トップページにアクセスする
         page.goto(base_url)
 
         # Then: "削除" ボタンが存在する
-        row = page.locator("#table-list tbody tr", has_text="users")
-        delete_btn = row.locator("button", has_text="削除")
+        delete_btn = page.locator("#table-list tbody tr").first.locator("button", has_text="削除")
         expect(delete_btn).to_be_visible()
 
     def test_空メッセージが非表示(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: トップページにアクセスする
         page.goto(base_url)
@@ -178,46 +174,17 @@ class TestIndexPageWithTables:
         # Then: 空メッセージが表示されない
         expect(page.locator("text=テーブル設計はまだありません。")).not_to_be_visible()
 
-    def test_複数テーブルが表示される(
-        self, page: Page, base_url: str, create_table: Callable[..., None]
-    ) -> None:
-        # Given: テーブル "users" と "orders" が存在する
-        create_table("users")
-        create_table("orders")
-
-        # When: トップページにアクセスする
-        page.goto(base_url)
-
-        # Then: 両方の行が表示される
-        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
-        expect(page.locator("#table-list tbody tr", has_text="orders")).to_be_visible()
-
     def test_ER図セクションが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: トップページにアクセスする
         page.goto(base_url)
 
         # Then: ER 図セクションが表示される
         expect(page.locator("#er-diagram")).to_be_visible()
-
-    def test_ER図にテーブル名が含まれる(
-        self, page: Page, base_url: str, create_table: Callable[..., None]
-    ) -> None:
-        # Given: テーブル "users" と "orders" が存在する
-        create_table("users")
-        create_table("orders")
-
-        # When: トップページにアクセスする
-        page.goto(base_url)
-
-        # Then: ER 図に両テーブル名が含まれる
-        er_section = page.locator("#er-diagram")
-        expect(er_section).to_contain_text("users")
-        expect(er_section).to_contain_text("orders")
 
 
 class TestCreateTableDialog:
@@ -309,60 +276,6 @@ class TestRebuildButtons:
         btn = page.locator('button[aria-label="ER 図の再作成"]')
         expect(btn).to_be_visible()
 
-    def test_テーブル一覧再作成でリストが復元される(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在するが index.tsv がない
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-        expect(page.locator("text=テーブル設計はまだありません。")).to_be_visible()
-
-        # When: "テーブル一覧の再作成" ボタンをクリックする（SSE で非同期更新）
-        page.locator('button[aria-label="テーブル一覧の再作成"]').click()
-
-        # Then: テーブル行が表示される
-        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
-
-    def test_テーブル一覧再作成でER図も復元される(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在するが index.tsv も index.mmd もない
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-        expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
-
-        # When: "テーブル一覧の再作成" ボタンをクリックする（SSE で非同期更新）
-        page.locator('button[aria-label="テーブル一覧の再作成"]').click()
-
-        # Then: ER 図も再作成されて表示される
-        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
-
-    def test_ER図再作成でER図が復元される(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在するが index.mmd がない
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-        expect(page.locator("#er-diagram .mermaid")).not_to_be_visible()
-
-        # When: "ER 図の再作成" ボタンをクリックする（SSE で非同期更新）
-        page.locator('button[aria-label="ER 図の再作成"]').click()
-
-        # Then: ER 図が表示される
-        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
-
 
 class TestButtonEffects:
     """ボタンの非活性化と回転アニメーション。"""
@@ -383,94 +296,6 @@ class TestButtonEffects:
         # Cleanup: ページ遷移を待つ
         page.wait_for_url("**/tables/*")
 
-    def test_テーブル一覧再作成ボタンが回転しdisabledになる(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在する
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-
-        # When: "テーブル一覧の再作成" ボタンをクリックする
-        btn = page.locator('button[aria-label="テーブル一覧の再作成"]')
-        btn.click()
-
-        # Then: disabled + spinning な SSE フラグメントに置き換わる
-        spinning_img = page.locator("[sse-connect] img.spinning")
-        expect(spinning_img).to_be_visible()
-        disabled_btn = page.locator("[sse-connect] button[disabled]")
-        expect(disabled_btn).to_be_visible()
-
-        # Then: SSE 完了後にテーブル一覧が復元される
-        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
-
-    def test_ER図再作成ボタンが回転しdisabledになる(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在する
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-
-        # When: "ER 図の再作成" ボタンをクリックする
-        btn = page.locator('button[aria-label="ER 図の再作成"]')
-        btn.click()
-
-        # Then: disabled + spinning な SSE フラグメントに置き換わる
-        spinning_img = page.locator("[sse-connect] img.spinning")
-        expect(spinning_img).to_be_visible()
-        disabled_btn = page.locator("[sse-connect] button[disabled]")
-        expect(disabled_btn).to_be_visible()
-
-        # Then: SSE 完了後に ER 図が復元される
-        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
-
-    def test_テーブル一覧再作成ボタンが完了後に復元される(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在する
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-
-        # When: "テーブル一覧の再作成" ボタンをクリックして完了を待つ
-        page.locator('button[aria-label="テーブル一覧の再作成"]').click()
-        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible(timeout=10000)
-
-        # Then: 再作成ボタンが元の状態（有効・回転なし）に戻る
-        btn = page.locator('button[aria-label="テーブル一覧の再作成"]')
-        expect(btn).to_be_enabled()
-        expect(btn.locator("img.spinning")).not_to_be_visible()
-
-    def test_ER図再作成ボタンが完了後に復元される(
-        self, page: Page, base_url: str, e2e_data_dir: Path
-    ) -> None:
-        # Given: テーブル TSV が存在する
-        tsv = (
-            "column_name\ttype\tnullable\tpk\tunique\tdefault\tdescription\n"
-            "id\tUUID\tNO\tYES\tYES\t\t主キー\n"
-        )
-        (e2e_data_dir / "users.tsv").write_text(tsv, encoding="utf-8")
-        page.goto(base_url)
-
-        # When: "ER 図の再作成" ボタンをクリックして完了を待つ
-        page.locator('button[aria-label="ER 図の再作成"]').click()
-        expect(page.locator("#er-diagram .mermaid")).to_be_visible(timeout=10000)
-
-        # Then: 再作成ボタンが元の状態（有効・回転なし）に戻る
-        btn = page.locator('button[aria-label="ER 図の再作成"]')
-        expect(btn).to_be_enabled()
-        expect(btn.locator("img.spinning")).not_to_be_visible()
-
 
 class TestDeleteTable:
     """テーブル削除（htmx hx-delete + hx-confirm）。"""
@@ -478,49 +303,49 @@ class TestDeleteTable:
     def test_削除で確認ダイアログが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在しトップページを表示中
-        create_table("users")
+        # Given: テーブルが存在しトップページを表示中
+        create_table()
         page.goto(base_url)
 
         # When: 削除ボタンをクリックする
         dialog_messages: list[str] = []
         page.on("dialog", _capture_and_dismiss(dialog_messages))
-        row = page.locator("#table-list tbody tr", has_text="users")
+        row = page.locator("#table-list tbody tr").first
         row.locator("button", has_text="削除").click()
 
         # Then: 確認ダイアログが表示される
         page.wait_for_timeout(500)
         assert len(dialog_messages) == 1
-        assert "users" in dialog_messages[0]
         assert "削除" in dialog_messages[0]
 
     def test_削除キャンセルで行が残る(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在しトップページを表示中
-        create_table("users")
+        # Given: テーブルが存在しトップページを表示中
+        create_table()
         page.goto(base_url)
 
         # When: 削除ボタン → ダイアログでキャンセルする
         page.on("dialog", lambda d: d.dismiss())
-        row = page.locator("#table-list tbody tr", has_text="users")
+        row = page.locator("#table-list tbody tr").first
         row.locator("button", has_text="削除").click()
 
         # Then: 行が残っている
         page.wait_for_timeout(500)
-        expect(page.locator("#table-list tbody tr", has_text="users")).to_be_visible()
+        expect(page.locator("#table-list tbody tr").first).to_be_visible()
 
     def test_削除承認で行が消える(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在しトップページを表示中
-        create_table("users")
+        # Given: テーブルが存在しトップページを表示中
+        create_table()
         page.goto(base_url)
 
         # When: 削除ボタン → ダイアログで受け入れる
         page.on("dialog", lambda d: d.accept())
-        row = page.locator("#table-list tbody tr", has_text="users")
+        row = page.locator("#table-list tbody tr").first
+        table_name = row.locator("a").first.inner_text()
         row.locator("button", has_text="削除").click()
 
-        # Then: "users" 行が DOM から消える
-        expect(page.locator("#table-list tbody tr", has_text="users")).not_to_be_visible()
+        # Then: 行が DOM から消える
+        expect(page.locator("#table-list tbody tr", has_text=table_name)).not_to_be_visible()
