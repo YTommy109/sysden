@@ -76,6 +76,32 @@ def test_AI経由でテーブルを作成する(client: TestClient, mock_openai:
     assert table_service.table_exists("stub_table")
 
 
+def test_同名テーブル作成で409(client: TestClient, mock_openai: None) -> None:
+    # Arrange: stub_table をあらかじめ作成しておく
+    client.post("/api/tables", data={"prompt": "テーブルを作って"}, follow_redirects=True)
+    assert table_service.table_exists("stub_table")
+
+    # Act: 同じ stub_table をもう一度作成しようとする
+    resp = client.post(
+        "/api/tables",
+        data={"prompt": "テーブルを作って"},
+        follow_redirects=False,
+    )
+
+    # Assert: 409 が返る
+    assert resp.status_code == 409
+
+
+def test_存在しないテーブルの更新は404(client: TestClient, mock_openai: None) -> None:
+    # Arrange: 存在しないテーブル名（有効な形式だが未作成）
+
+    # Act: 存在しないテーブルの更新 API にリクエストを送る
+    resp = client.post("/api/tables/nonexistent_table", data={"prompt": "更新"})
+
+    # Assert: 404 が返る
+    assert resp.status_code == 404
+
+
 def test_AI経由でテーブルを更新する(client: TestClient, mock_openai: None) -> None:
     # Arrange: テーブルが存在する
     _save_sample_table()

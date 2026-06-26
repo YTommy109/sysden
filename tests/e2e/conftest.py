@@ -84,18 +84,3 @@ def create_table(base_url: str) -> Callable[..., None]:
         assert resp.status_code == 200
 
     return _create
-
-
-@pytest.fixture()
-def create_table_auto(base_url: str) -> Callable[..., None]:
-    """AI にテーブル名も決めさせてテーブルを作成するヘルパー。"""
-
-    def _create(prompt: str = "テスト用テーブル") -> None:
-        resp = httpx.post(
-            f"{base_url}/api/tables",
-            data={"prompt": prompt},
-            follow_redirects=True,
-        )
-        assert resp.status_code == 200
-
-    return _create
