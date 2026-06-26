@@ -68,26 +68,24 @@ def test_論理設計で型名が日本語に変換される(sql_type: str, expe
     assert result[0]["型"] == expected
 
 
-def test_論理設計で日本語カラム名が使われる() -> None:
+@pytest.mark.parametrize(
+    ("logical_name", "nullable", "expected"),
+    [
+        ("商品名", "NO", "* 商品名"),
+        ("備考", "YES", "備考"),
+    ],
+)
+def test_論理設計でnullableに応じてアスタリスクが付く(
+    logical_name: str, nullable: str, expected: str
+) -> None:
     # Arrange
-    col = _make_column(logical_name="商品名", type="varchar(100)", nullable="NO")
+    col = _make_column(logical_name=logical_name, type="varchar(100)", nullable=nullable)
 
     # Act
     result = table_service.derive_logical([col])
 
     # Assert
-    assert result[0]["カラム名"] == "* 商品名"
-
-
-def test_論理設計でnullableなカラムにはアスタリスクがつかない() -> None:
-    # Arrange
-    col = _make_column(logical_name="備考", type="text", nullable="YES")
-
-    # Act
-    result = table_service.derive_logical([col])
-
-    # Assert
-    assert result[0]["カラム名"] == "備考"
+    assert result[0]["カラム名"] == expected
 
 
 def test_論理設計でユニークフラグが変換される() -> None:
@@ -473,3 +471,14 @@ class TestTableServiceLogging:
         with caplog.at_level(logging.INFO, logger="app.table_service"):
             table_service.rebuild_index()
         assert "インデックス再構築完了" in caplog.text
+
+    def test_存在しないテーブルの削除で警告ログが出力される(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with (
+            caplog.at_level(logging.WARNING, logger="app.table_service"),
+            pytest.raises(FileNotFoundError),
+        ):
+            table_service.delete_table("nonexistent")
+        assert "テーブル削除失敗" in caplog.text
+        assert "table=nonexistent" in caplog.text

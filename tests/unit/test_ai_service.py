@@ -29,13 +29,15 @@ columns[2]{symbol,logical_name,physical_name,type,nullable,pk,unique,default,fk_
 SINGLE_TABLE_RESPONSE = SAMPLE_CORE_TOON
 
 
+def _raise_runtime_error(**_kwargs: object) -> None:
+    raise RuntimeError("API error")
+
+
 @pytest.fixture()
 def mock_openai(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
     """OpenAI クライアントをスタブに差し替え、API 呼び出しを記録する。"""
     calls: list[dict] = []
-    monkeypatch.setattr(
-        ai_service, "get_client", lambda: make_fake_openai_client(calls=calls)
-    )
+    monkeypatch.setattr(ai_service, "get_client", lambda: make_fake_openai_client(calls=calls))
     return calls
 
 
@@ -97,9 +99,7 @@ def test_更新モードで現在のコア設計がプロンプトに含まれ�
 ) -> None:
     # Arrange
     calls: list[dict] = []
-    fake = make_fake_openai_client(
-        response=SINGLE_TABLE_RESPONSE, calls=calls
-    )
+    fake = make_fake_openai_client(response=SINGLE_TABLE_RESPONSE, calls=calls)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
 
     current = parse_table_toon(SINGLE_TABLE_RESPONSE)
@@ -132,9 +132,7 @@ def test_テストモードでスタブを返す(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
 
     # Act
-    tables = ai_service.create_table_design(
-        prompt="何でも", rules=[], existing_tables=[]
-    )
+    tables = ai_service.create_table_design(prompt="何でも", rules=[], existing_tables=[])
 
     # Assert
     assert len(tables) == 1
@@ -156,9 +154,7 @@ class TestAiServiceLogging:
         self, mock_openai: list[dict], caplog: pytest.LogCaptureFixture
     ) -> None:
         with caplog.at_level(logging.INFO, logger="app.ai_service"):
-            ai_service.create_table_design(
-                prompt="テスト", rules=[], existing_tables=[]
-            )
+            ai_service.create_table_design(prompt="テスト", rules=[], existing_tables=[])
         assert "AI コア設計生成開始" in caplog.text
         assert "AI コア設計生成完了" in caplog.text
 
@@ -167,7 +163,39 @@ class TestAiServiceLogging:
     ) -> None:
         monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
         with caplog.at_level(logging.INFO, logger="app.ai_service"):
-            ai_service.create_table_design(
-                prompt="テスト", rules=[], existing_tables=[]
-            )
+            ai_service.create_table_design(prompt="テスト", rules=[], existing_tables=[])
         assert "テストモード" in caplog.text
+
+    def test_生成失敗時にエラーログが出力される(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        fake = make_fake_openai_client()
+        fake.chat.completions.create = _raise_runtime_error
+        monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+
+        with (
+            caplog.at_level(logging.ERROR, logger="app.ai_service"),
+            pytest.raises(RuntimeError),
+        ):
+            ai_service.create_table_design(prompt="テスト", rules=[], existing_tables=[])
+
+        assert "AI コア設計生成失敗" in caplog.text
+
+    def test_更新失敗時にテーブル名がログ出力される(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        fake = make_fake_openai_client()
+        fake.chat.completions.create = _raise_runtime_error
+        monkeypatch.setattr(ai_service, "get_client", lambda: fake)
+        current = parse_table_toon(SAMPLE_CORE_TOON)
+
+        with (
+            caplog.at_level(logging.ERROR, logger="app.ai_service"),
+            pytest.raises(RuntimeError),
+        ):
+            ai_service.update_table_design(
+                prompt="テスト", current=current, rules=[], existing_tables=[]
+            )
+
+        assert "AI コア設計更新失敗" in caplog.text
+        assert "stub_table" in caplog.text
