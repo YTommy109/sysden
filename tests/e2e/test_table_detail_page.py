@@ -4,6 +4,9 @@ from collections.abc import Callable
 
 from playwright.sync_api import Page, expect
 
+_TABLE_NAME = "stub_table"
+_TABLE_DISPLAY = "スタブ"
+
 
 class TestTableDetailDisplay:
     """テーブル詳細ページの表示要素。"""
@@ -11,71 +14,115 @@ class TestTableDetailDisplay:
     def test_テーブル名の見出しが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する（テストモードでは "スタブ" が作成される）
+        create_table()
 
         # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
-        # Then: h1 にテーブル名が表示される
-        expect(page.locator("h1")).to_have_text("users")
+        # Then: h1 に論理名が表示される
+        expect(page.locator("h1")).to_have_text(_TABLE_DISPLAY)
 
     def test_ページタイトルが正しい(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # Then: ページタイトルが正しい
-        expect(page).to_have_title("users — sysden")
+        expect(page).to_have_title(f"{_TABLE_DISPLAY} — sysden")
 
     def test_戻るアイコンが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # Then: 一覧に戻るアイコンリンクが / を指す
         back_link = page.locator('a[href="/"][aria-label="一覧に戻る"]')
         expect(back_link).to_be_visible()
 
-    def test_テーブルがレンダリングされる(
+    def test_論理設計タブが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
-        # Then: #table-view 内に HTML テーブルが描画される
-        table_view = page.locator("#table-view")
-        expect(table_view).to_be_visible()
-        expect(table_view.locator("table")).to_be_visible()
+        # Then: 論理設計タブが存在し初期状態でアクティブ
+        tab = page.locator(".tabs button", has_text="論理設計")
+        expect(tab).to_be_visible()
+        expect(tab).to_have_class("tab active")
 
-        # Then: ヘッダーに日本語カラム名が含まれる
-        expect(table_view.locator("th", has_text="カラム名")).to_be_visible()
+    def test_物理設計タブが表示される(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: テーブルが存在する
+        create_table()
 
-        # Then: データ行に "id" が含まれる（PK は太字で表示）
-        expect(table_view.locator("td >> strong", has_text="id")).to_be_visible()
+        # When: 詳細ページにアクセスする
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
+
+        # Then: 物理設計タブが存在する
+        tab = page.locator(".tabs button", has_text="物理設計")
+        expect(tab).to_be_visible()
+
+    def test_DoAタブが表示される(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: テーブルが存在する
+        create_table()
+
+        # When: 詳細ページにアクセスする
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
+
+        # Then: DoA タブが存在する
+        tab = page.locator(".tabs button", has_text="DoA")
+        expect(tab).to_be_visible()
+
+    def test_論理設計が初期表示される(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: テーブルが存在する
+        create_table()
+
+        # When: 詳細ページにアクセスする
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
+
+        # Then: 論理設計コンテンツが表示されている
+        expect(page.locator("#logical")).to_be_visible()
+
+    def test_物理設計は初期状態で非表示(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: テーブルが存在する
+        create_table()
+
+        # When: 詳細ページにアクセスする
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
+
+        # Then: 物理設計コンテンツは非表示
+        expect(page.locator("#physical")).to_be_hidden()
 
     def test_更新フォームが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # Then: 更新フォームが正しい action を持つ
-        form = page.locator('form[action="/api/tables/users"]')
+        form = page.locator(f'form[action="/api/tables/{_TABLE_NAME}"]')
         expect(form).to_be_visible()
         expect(form).to_have_attribute("method", "post")
 
@@ -85,44 +132,66 @@ class TestTableDetailDisplay:
         # Then: 更新ボタンが存在する
         expect(form.locator('button[type="submit"]')).to_have_text("更新を依頼")
 
-    def test_更新依頼の見出しが表示される(
-        self, page: Page, base_url: str, create_table: Callable[..., None]
-    ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
-
-        # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
-
-        # Then: "AI に更新を依頼" 見出しが表示される
-        expect(page.locator("h2", has_text="AI に更新を依頼")).to_be_visible()
-
     def test_ナビバーリンクが存在する(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在する
-        create_table("users")
+        # Given: テーブルが存在する
+        create_table()
 
         # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/users")
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # Then: ナビバーの sysden リンクが / を指す
         expect(page.locator('nav a[href="/"]')).to_be_visible()
 
-    def test_Markdown説明が表示される(
-        self, page: Page, base_url: str, create_table_auto: Callable[..., None]
+
+class TestTabSwitching:
+    """タブ切り替え UI のテスト。"""
+
+    def test_物理設計タブクリックで物理設計が表示される(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブルがテストモードで作成される（AI が名前 + TSV + markdown を生成）
-        create_table_auto()
+        # Given: テーブルが存在し詳細ページを表示中
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
-        # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/stub_table")
+        # When: 物理設計タブをクリックする
+        page.locator(".tabs button", has_text="物理設計").click()
 
-        # Then: markdown の内容がレンダリングされている
-        expect(page.locator("#table-view")).to_contain_text("テスト用テーブル")
+        # Then: 物理設計が表示され論理設計が非表示になる
+        expect(page.locator("#physical")).to_be_visible()
+        expect(page.locator("#logical")).to_be_hidden()
 
-        # Then: 埋め込み TSV テーブルも表示される
-        expect(page.locator("#table-view table")).to_be_visible()
+    def test_DoAタブクリックでDoAが表示される(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: テーブルが存在し詳細ページを表示中
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
+
+        # When: DoA タブをクリックする
+        page.locator(".tabs button", has_text="DoA").click()
+
+        # Then: DoA が表示され他が非表示になる
+        expect(page.locator("#doa")).to_be_visible()
+        expect(page.locator("#logical")).to_be_hidden()
+        expect(page.locator("#physical")).to_be_hidden()
+
+    def test_論理設計タブに戻れる(
+        self, page: Page, base_url: str, create_table: Callable[..., None]
+    ) -> None:
+        # Given: 物理設計タブが選択された状態
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
+        page.locator(".tabs button", has_text="物理設計").click()
+        expect(page.locator("#physical")).to_be_visible()
+
+        # When: 論理設計タブをクリックする
+        page.locator(".tabs button", has_text="論理設計").click()
+
+        # Then: 論理設計が再表示され物理設計が非表示になる
+        expect(page.locator("#logical")).to_be_visible()
+        expect(page.locator("#physical")).to_be_hidden()
 
 
 class TestTableDetailUpdate:
@@ -131,27 +200,24 @@ class TestTableDetailUpdate:
     def test_更新後に同じページへリダイレクト(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在し詳細ページを表示中
-        create_table("users")
-        page.goto(f"{base_url}/tables/users")
+        # Given: テーブルが存在し詳細ページを表示中
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # When: 更新フォームに入力して送信する
         page.fill('textarea[name="prompt"]', "email カラムを追加して")
         page.click('button[type="submit"]')
 
         # Then: 同じ詳細ページにリダイレクトされる
-        page.wait_for_url("**/tables/users")
-        expect(page.locator("h1")).to_have_text("users")
-
-        # Then: テーブルが表示される
-        expect(page.locator("#table-view table")).to_be_visible()
+        page.wait_for_url(f"**/{_TABLE_NAME}")
+        expect(page.locator("h1")).to_have_text(_TABLE_DISPLAY)
 
     def test_更新送信ボタンがリクエスト中にdisabledになる(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
-        # Given: テーブル "users" が存在し詳細ページを表示中
-        create_table("users")
-        page.goto(f"{base_url}/tables/users")
+        # Given: テーブルが存在し詳細ページを表示中
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # When: 更新フォームに入力して送信する
         page.fill('textarea[name="prompt"]', "email カラムを追加して")
@@ -162,7 +228,7 @@ class TestTableDetailUpdate:
         expect(submit_btn).to_be_disabled()
 
         # Cleanup: ページ遷移を待つ
-        page.wait_for_url("**/tables/users")
+        page.wait_for_url(f"**/{_TABLE_NAME}")
 
 
 class TestTableDetailNavigation:
@@ -172,8 +238,8 @@ class TestTableDetailNavigation:
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
-        create_table("users")
-        page.goto(f"{base_url}/tables/users")
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # When: 戻るアイコンをクリックする
         page.click('a[href="/"][aria-label="一覧に戻る"]')
@@ -186,8 +252,8 @@ class TestTableDetailNavigation:
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブル詳細ページを表示中
-        create_table("users")
-        page.goto(f"{base_url}/tables/users")
+        create_table()
+        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
         # When: ナビバーの "sysden" リンクをクリックする
         page.click("nav a")

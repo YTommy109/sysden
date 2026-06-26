@@ -64,35 +64,18 @@ def base_url(e2e_server: str) -> str:
 
 @pytest.fixture(autouse=True)
 def clean_data(e2e_data_dir: Path) -> None:
-    """各テスト前にデータディレクトリの TSV / markdown を削除する。"""
-    for f in e2e_data_dir.glob("*.tsv"):
+    """各テスト前にデータディレクトリの TOON ファイルを削除する。"""
+    for f in e2e_data_dir.glob("*.toon"):
         f.unlink()
-    for f in e2e_data_dir.glob("*.mmd"):
-        f.unlink()
-    for f in e2e_data_dir.glob("*.md"):
+    for f in e2e_data_dir.glob("*.yaml"):
         f.unlink()
 
 
 @pytest.fixture()
 def create_table(base_url: str) -> Callable[..., None]:
-    """API 経由でテーブルを作成するヘルパー。"""
+    """API 経由でテーブルを作成するヘルパー。テストモードでは stub_table が作成される。"""
 
-    def _create(name: str, prompt: str = "テスト用テーブル") -> None:
-        resp = httpx.post(
-            f"{base_url}/api/tables",
-            data={"name": name, "prompt": prompt},
-            follow_redirects=True,
-        )
-        assert resp.status_code == 200
-
-    return _create
-
-
-@pytest.fixture()
-def create_table_auto(base_url: str) -> Callable[..., None]:
-    """AI にテーブル名も決めさせてテーブルを作成するヘルパー。"""
-
-    def _create(prompt: str = "テスト用テーブル") -> None:
+    def _create(_name: str = "stub_table", prompt: str = "テスト用テーブル") -> None:
         resp = httpx.post(
             f"{base_url}/api/tables",
             data={"prompt": prompt},

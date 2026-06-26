@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from markdown_it import MarkdownIt
 
 from app import table_service
+from app.toon_io import read_index_toon
 
 logger = logging.getLogger(__name__)
 
@@ -15,73 +16,64 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent.parent / 
 _md = MarkdownIt("commonmark", {"html": True}).enable("table")
 
 
+def _dict_list_to_markdown_table(rows: list[dict[str, str]]) -> str:
+    if not rows:
+        return "_（データなし）_"
+    headers = list(rows[0].keys())
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join("---" for _ in headers) + " |",
+    ]
+    for row in rows:
+        cells = [str(row.get(h, "")) for h in headers]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
-    """テーブル一覧ページを表示する。"""
-    tables = table_service.read_index_tables()
-    er_diagram = table_service.read_er_diagram()
+    index_doc = read_index_toon()
+    tables = [{"name": t.name, "display_name": t.logical_name} for t in index_doc.tables]
     return templates.TemplateResponse(
-        request, "index.html", {"tables": tables, "er_diagram": er_diagram}
+        request,
+        "index.html",
+        {"tables": tables, "er_diagram": index_doc.er_diagram, "rules": index_doc.rules},
     )
 
 
 @router.get("/tables/{name}", response_class=HTMLResponse)
 def table_detail(name: str, request: Request) -> HTMLResponse:
-    """テーブル詳細ページを表示する。
-
-    markdown が存在する場合は埋め込み TSV を展開してレンダリングする。
-    """
     if not table_service.validate_table_name(name):
         raise HTTPException(status_code=422, detail=f"Invalid table name: '{name}'")
     try:
-        rows = table_service.read_tsv(name)
+        doc = table_service.get_table(name)
     except FileNotFoundError as err:
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found") from err
+        raise HTTPException(status_code=404, detail=str(err)) from err
 
-    display_name = table_service.read_table_display_name(name)
+    logical_html = ""
+    physical_html = ""
+    doa_html = ""
 
-    md_content = table_service.read_markdown(name)
-    if md_content is not None:
-        body = table_service.strip_title_heading(md_content)
-        expanded = table_service.render_markdown_with_embeds(body)
-        rendered = _md.render(expanded)
-    else:
-        md_table = table_service.tsv_to_markdown(rows)
-        rendered = _md.render(md_table)
+    if doc.logical:
+        logical_html = _md.render(_dict_list_to_markdown_table(doc.logical))
+        logical_html = logical_html.replace(
+            "<td>* ",
+            '<td><span style="color:red;font-weight:bold;">*</span> ',
+        )
+    if doc.physical:
+        physical_html = _md.render(_dict_list_to_markdown_table(doc.physical))
+    if doc.doa:
+        doa_html = _md.render(_dict_list_to_markdown_table(doc.doa))
 
     return templates.TemplateResponse(
         request,
         "table_detail.html",
-        {"name": name, "display_name": display_name, "rendered": rendered},
-    )
-
-
-@router.get("/tables/{name}/physical", response_class=HTMLResponse)
-def physical_detail(name: str, request: Request) -> HTMLResponse:
-    """物理設計ページを表示する。"""
-    if not table_service.validate_table_name(name):
-        raise HTTPException(status_code=422, detail=f"Invalid table name: '{name}'")
-    if not table_service.table_exists(name):
-        raise HTTPException(status_code=404, detail=f"Table '{name}' not found")
-
-    display_name = table_service.read_table_display_name(name)
-    has_physical = table_service.physical_design_exists(name)
-
-    rendered = ""
-    if has_physical:
-        md_content = table_service.read_physical_markdown(name)
-        if md_content is not None:
-            body = table_service.strip_title_heading(md_content)
-            expanded = table_service.render_markdown_with_embeds(body)
-            rendered = _md.render(expanded)
-
-    return templates.TemplateResponse(
-        request,
-        "physical_detail.html",
         {
             "name": name,
-            "display_name": display_name,
-            "has_physical": has_physical,
-            "rendered": rendered,
+            "display_name": doc.meta.logical_name,
+            "symbol": doc.meta.symbol,
+            "logical_html": logical_html,
+            "physical_html": physical_html,
+            "doa_html": doa_html,
         },
     )
