@@ -26,8 +26,8 @@ _TYPE_MAP: dict[str, str] = {
     "text": "テキスト",
     "boolean": "真偽値",
     "date": "日付",
-    "timestamp": "タイムスタンプ",
-    "timestamptz": "タイムスタンプ",
+    "timestamp": "日時",
+    "timestamptz": "日時",
 }
 
 _PYTHON_TYPE_MAP: dict[str, str] = {
@@ -62,9 +62,10 @@ def derive_logical(columns: list[Column]) -> list[dict[str, str]]:
     for col in columns:
         base, params = _split_type(col.type)
         jp_type = _TYPE_MAP.get(base, col.type) + params
+        name = f"* {col.logical_name}" if col.nullable == "NO" else col.logical_name
         rows.append(
             {
-                "カラム名": col.logical_name,
+                "カラム名": name,
                 "型": jp_type,
                 "ユニーク": "○" if col.unique.upper() == "YES" else "",
                 "説明": col.description,
@@ -73,24 +74,77 @@ def derive_logical(columns: list[Column]) -> list[dict[str, str]]:
     return rows
 
 
-def derive_physical(columns: list[Column]) -> list[dict[str, str]]:
-    return [
+def derive_physical(doc: ToonDocument) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = [
         {
-            "column_name": col.physical_name,
-            "type": col.type,
-            "nullable": col.nullable,
-            "pk": col.pk,
-            "unique": col.unique,
-            "default": col.default,
-            "description": col.description,
-        }
-        for col in columns
+            "column_name": "id",
+            "type": "uuid",
+            "nullable": "NO",
+            "pk": "YES",
+            "unique": "YES",
+            "default": "uuidv7()",
+            "description": "サロゲートキー",
+        },
     ]
+    for col in doc.columns:
+        rows.append(
+            {
+                "column_name": col.physical_name,
+                "type": col.type,
+                "nullable": col.nullable,
+                "pk": col.pk,
+                "unique": col.unique,
+                "default": col.default,
+                "description": col.description,
+            }
+        )
+    rows.extend(
+        [
+            {
+                "column_name": "created_at",
+                "type": "timestamptz",
+                "nullable": "NO",
+                "pk": "NO",
+                "unique": "NO",
+                "default": "now()",
+                "description": "作成日時",
+            },
+            {
+                "column_name": "updated_at",
+                "type": "timestamptz",
+                "nullable": "NO",
+                "pk": "NO",
+                "unique": "NO",
+                "default": "now()",
+                "description": "更新日時",
+            },
+            {
+                "column_name": "disabled_at",
+                "type": "timestamptz",
+                "nullable": "YES",
+                "pk": "NO",
+                "unique": "NO",
+                "default": "NONE",
+                "description": "無効化日時",
+            },
+        ]
+    )
+    return rows
 
 
-def derive_doa(columns: list[Column]) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
-    for col in columns:
+def derive_doa(doc: ToonDocument) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = [
+        {
+            "column_name": "id",
+            "python_type": "UUID",
+            "required": "YES",
+            "min": "",
+            "max": "",
+            "max_length": "",
+            "description": "サロゲートキー",
+        },
+    ]
+    for col in doc.columns:
         base, params = _split_type(col.type)
         python_type = _PYTHON_TYPE_MAP.get(base, base)
         max_length = ""
@@ -107,6 +161,37 @@ def derive_doa(columns: list[Column]) -> list[dict[str, str]]:
                 "description": col.description,
             }
         )
+    rows.extend(
+        [
+            {
+                "column_name": "created_at",
+                "python_type": "datetime",
+                "required": "YES",
+                "min": "",
+                "max": "",
+                "max_length": "",
+                "description": "作成日時",
+            },
+            {
+                "column_name": "updated_at",
+                "python_type": "datetime",
+                "required": "YES",
+                "min": "",
+                "max": "",
+                "max_length": "",
+                "description": "更新日時",
+            },
+            {
+                "column_name": "disabled_at",
+                "python_type": "datetime",
+                "required": "NO",
+                "min": "",
+                "max": "",
+                "max_length": "",
+                "description": "無効化日時",
+            },
+        ]
+    )
     return rows
 
 
@@ -114,8 +199,8 @@ def derive_all(doc: ToonDocument) -> ToonDocument:
     return doc.model_copy(
         update={
             "logical": derive_logical(doc.columns),
-            "physical": derive_physical(doc.columns),
-            "doa": derive_doa(doc.columns),
+            "physical": derive_physical(doc),
+            "doa": derive_doa(doc),
         }
     )
 

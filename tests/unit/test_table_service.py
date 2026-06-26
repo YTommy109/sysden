@@ -52,8 +52,8 @@ def _make_column(**overrides: str) -> Column:
         ("text", "テキスト"),
         ("boolean", "真偽値"),
         ("date", "日付"),
-        ("timestamp", "タイムスタンプ"),
-        ("timestamptz", "タイムスタンプ"),
+        ("timestamp", "日時"),
+        ("timestamptz", "日時"),
         ("custom_type", "custom_type"),
     ],
 )
@@ -70,13 +70,24 @@ def test_論理設計で型名が日本語に変換される(sql_type: str, expe
 
 def test_論理設計で日本語カラム名が使われる() -> None:
     # Arrange
-    col = _make_column(logical_name="商品名", type="varchar(100)")
+    col = _make_column(logical_name="商品名", type="varchar(100)", nullable="NO")
 
     # Act
     result = table_service.derive_logical([col])
 
     # Assert
-    assert result[0]["カラム名"] == "商品名"
+    assert result[0]["カラム名"] == "* 商品名"
+
+
+def test_論理設計でnullableなカラムにはアスタリスクがつかない() -> None:
+    # Arrange
+    col = _make_column(logical_name="備考", type="text", nullable="YES")
+
+    # Act
+    result = table_service.derive_logical([col])
+
+    # Assert
+    assert result[0]["カラム名"] == "備考"
 
 
 def test_論理設計でユニークフラグが変換される() -> None:
@@ -92,22 +103,30 @@ def test_論理設計でユニークフラグが変換される() -> None:
     assert result[1]["ユニーク"] == ""
 
 
+def _make_doc(*cols: Column) -> ToonDocument:
+    return ToonDocument(
+        meta=TableMeta(symbol="", logical_name="", physical_name="", description=""),
+        columns=list(cols),
+    )
+
+
 def test_物理設計でphysical_nameが使われる() -> None:
     # Arrange
     col = _make_column(physical_name="product_id", type="uuid")
+    doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_physical([col])
+    result = table_service.derive_physical(doc)
 
-    # Assert
-    assert result[0]["column_name"] == "product_id"
-    assert result[0]["type"] == "uuid"
+    # Assert — index 0 is surrogate key "id", index 1 is the column
+    assert result[1]["column_name"] == "product_id"
+    assert result[1]["type"] == "uuid"
 
 
 def test_物理設計で全フィールドが含まれる() -> None:
     # Arrange
     col = _make_column(
-        physical_name="id",
+        physical_name="col_a",
         type="uuid",
         nullable="NO",
         pk="YES",
@@ -115,17 +134,35 @@ def test_物理設計で全フィールドが含まれる() -> None:
         default="gen_random_uuid()",
         description="主キー",
     )
+    doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_physical([col])
+    result = table_service.derive_physical(doc)
 
-    # Assert
-    row = result[0]
+    # Assert — index 1 is the column (index 0 is surrogate key)
+    row = result[1]
     assert row["nullable"] == "NO"
     assert row["pk"] == "YES"
     assert row["unique"] == "YES"
     assert row["default"] == "gen_random_uuid()"
     assert row["description"] == "主キー"
+
+
+def test_物理設計でサロゲートキーと操作記録が付与される() -> None:
+    # Arrange
+    col = _make_column(physical_name="name", type="varchar(100)")
+    doc = _make_doc(col)
+
+    # Act
+    result = table_service.derive_physical(doc)
+
+    # Assert
+    assert result[0]["column_name"] == "id"
+    assert result[0]["default"] == "uuidv7()"
+    assert result[-3]["column_name"] == "created_at"
+    assert result[-2]["column_name"] == "updated_at"
+    assert result[-1]["column_name"] == "disabled_at"
+    assert len(result) == 5
 
 
 @pytest.mark.parametrize(
@@ -148,36 +185,55 @@ def test_物理設計で全フィールドが含まれる() -> None:
 def test_DoAでSQL型がPython型に変換される(sql_type: str, expected_python_type: str) -> None:
     # Arrange
     col = _make_column(type=sql_type, physical_name="test_col")
+    doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_doa([col])
+    result = table_service.derive_doa(doc)
 
-    # Assert
-    assert result[0]["python_type"] == expected_python_type
+    # Assert — index 0 is surrogate key "id", index 1 is the column
+    assert result[1]["python_type"] == expected_python_type
 
 
 def test_DoAでvarcharのmax_lengthが抽出される() -> None:
     # Arrange
     col = _make_column(type="varchar(100)", physical_name="name")
+    doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_doa([col])
+    result = table_service.derive_doa(doc)
 
-    # Assert
-    assert result[0]["max_length"] == "100"
+    # Assert — index 1 is the column
+    assert result[1]["max_length"] == "100"
 
 
 def test_DoAでnullableがrequiredに変換される() -> None:
     # Arrange
     col_required = _make_column(nullable="NO")
     col_optional = _make_column(nullable="YES")
+    doc = _make_doc(col_required, col_optional)
 
     # Act
-    result = table_service.derive_doa([col_required, col_optional])
+    result = table_service.derive_doa(doc)
+
+    # Assert — index 0 is surrogate key, indices 1 and 2 are the columns
+    assert result[1]["required"] == "YES"
+    assert result[2]["required"] == "NO"
+
+
+def test_DoAでサロゲートキーと操作記録が付与される() -> None:
+    # Arrange
+    col = _make_column(physical_name="name", type="varchar(100)")
+    doc = _make_doc(col)
+
+    # Act
+    result = table_service.derive_doa(doc)
 
     # Assert
-    assert result[0]["required"] == "YES"
-    assert result[1]["required"] == "NO"
+    assert result[0]["column_name"] == "id"
+    assert result[-3]["column_name"] == "created_at"
+    assert result[-2]["column_name"] == "updated_at"
+    assert result[-1]["column_name"] == "disabled_at"
+    assert len(result) == 5
 
 
 def test_derive_allで3セクションが追加される() -> None:
@@ -187,13 +243,13 @@ def test_derive_allで3セクションが追加される() -> None:
     # Act
     result = table_service.derive_all(doc)
 
-    # Assert
+    # Assert — 1 user column + 1 surrogate key + 3 operation timestamps = 5
     assert result.logical is not None
     assert result.physical is not None
     assert result.doa is not None
     assert len(result.logical) == 1
-    assert len(result.physical) == 1
-    assert len(result.doa) == 1
+    assert len(result.physical) == 5
+    assert len(result.doa) == 5
 
 
 # ── CRUD ──

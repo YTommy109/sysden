@@ -24,6 +24,17 @@
   </form>
 </dialog>
 
+{% if rules %}
+<div style="margin-bottom:1.5rem; padding:1rem; background:#f8f9fa; border-radius:6px; border:1px solid #e9ecef;">
+  <h2 style="margin-top:0; font-size:1.1rem;">共通ルール</h2>
+  <ul style="margin:0; padding-left:1.5rem;">
+    {% for rule in rules %}
+    <li>{{ rule }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 <div id="index-body">
 <div id="table-list">
   <div style="display:flex; justify-content:flex-end; margin-bottom:0.5rem;">

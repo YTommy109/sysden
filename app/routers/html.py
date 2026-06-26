@@ -37,7 +37,7 @@ def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"tables": tables, "er_diagram": index_doc.er_diagram},
+        {"tables": tables, "er_diagram": index_doc.er_diagram, "rules": index_doc.rules},
     )
 
 
@@ -56,6 +56,10 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
 
     if doc.logical:
         logical_html = _md.render(_dict_list_to_markdown_table(doc.logical))
+        logical_html = logical_html.replace(
+            "<td>* ",
+            '<td><span style="color:red;font-weight:bold;">*</span> ',
+        )
     if doc.physical:
         physical_html = _md.render(_dict_list_to_markdown_table(doc.physical))
     if doc.doa:
