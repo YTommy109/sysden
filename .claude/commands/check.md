@@ -1,25 +1,5 @@
 # /check — 品質チェック
 
-以下を順番に実行して結果を報告してください。
-
-1. **Ruff lint**
-   ```bash
-   uv run task lint
-   ```
-
-2. **Ruff format check**
-   ```bash
-   uv run ruff format --check .
-   ```
-
-3. **ty 型チェック**
-   ```bash
-   uv run task typecheck
-   ```
-
-4. **ユニット + 統合テスト（カバレッジ付き）**
-   ```bash
-   uv run task test
-   ```
+[docs/coding_rule.md の品質チェック手順](../docs/coding_rule.md#品質チェック手順)に従って順番に実行し、結果を報告してください。
 
 問題が見つかった場合は修正してから再実行してください。すべて通過したら「✅ チェック完了」と報告してください。

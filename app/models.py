@@ -26,7 +26,7 @@ class ToonDocument(BaseModel):
     columns: list[Column]
     logical: list[dict[str, str]] | None = None
     physical: list[dict[str, str]] | None = None
-    doa: list[dict[str, str]] | None = None
+    dao: list[dict[str, str]] | None = None
 
 
 class TableSummary(BaseModel):

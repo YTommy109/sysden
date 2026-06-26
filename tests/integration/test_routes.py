@@ -57,7 +57,7 @@ def test_テーブル詳細ページにタブが含まれる(client: TestClient)
     assert resp.status_code == 200
     assert "論理設計" in resp.text
     assert "物理設計" in resp.text
-    assert "DoA" in resp.text
+    assert "DAO" in resp.text
     assert "ユーザー" in resp.text
 
 

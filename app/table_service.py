@@ -132,7 +132,7 @@ def derive_physical(doc: ToonDocument) -> list[dict[str, str]]:
     return rows
 
 
-def derive_doa(doc: ToonDocument) -> list[dict[str, str]]:
+def derive_dao(doc: ToonDocument) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = [
         {
             "column_name": "id",
@@ -200,7 +200,7 @@ def derive_all(doc: ToonDocument) -> ToonDocument:
         update={
             "logical": derive_logical(doc.columns),
             "physical": derive_physical(doc),
-            "doa": derive_doa(doc),
+            "dao": derive_dao(doc),
         }
     )
 
