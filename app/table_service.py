@@ -147,13 +147,15 @@ def delete_table(name: str) -> None:
     logger.info("テーブル削除: table=%s", name)
 
 
-def generate_er_diagram() -> str:
-    index = read_index_toon()
-    if not index.tables:
+def generate_er_diagram(tables: list[TableSummary] | None = None) -> str:
+    if tables is None:
+        index = read_index_toon()
+        tables = index.tables
+    if not tables:
         return ""
     lines = ["erDiagram"]
     relations: list[str] = []
-    for summary in index.tables:
+    for summary in tables:
         display = f'{summary.symbol}["{summary.logical_name}"]'
         lines.append(f"    {display}")
         try:
@@ -163,7 +165,7 @@ def generate_er_diagram() -> str:
         for col in doc.columns:
             if not col.fk_target:
                 continue
-            target = next((t for t in index.tables if t.symbol == col.fk_target), None)
+            target = next((t for t in tables if t.symbol == col.fk_target), None)
             if target is None:
                 continue
             nullable = col.nullable.upper() == "YES"
@@ -192,7 +194,7 @@ def rebuild_index() -> None:
             )
         )
     index = read_index_toon()
-    er = generate_er_diagram() if tables else ""
+    er = generate_er_diagram(tables) if tables else ""
     updated = index.model_copy(update={"tables": tables, "er_diagram": er})
     write_index_toon(updated)
     logger.info("インデックス再構築完了")

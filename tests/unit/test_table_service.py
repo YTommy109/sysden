@@ -318,8 +318,11 @@ def test_FK関係がER図に含まれる() -> None:
     table_service.save_table("orders", orders)
     table_service.rebuild_index()
 
-    # Act
-    result = table_service.generate_er_diagram()
+    # Act — read ER diagram stored in index by rebuild_index
+    from app.toon_io import read_index_toon
+
+    index = read_index_toon()
+    result = index.er_diagram
 
     # Assert
     assert "erDiagram" in result
