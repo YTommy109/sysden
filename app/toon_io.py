@@ -178,7 +178,8 @@ def serialize_table_toon(doc: ToonDocument) -> str:
     parts: list[str] = []
 
     parts.append("meta:")
-    parts.append(f"  symbol: {doc.meta.symbol}")
+    if doc.meta.symbol is not None:
+        parts.append(f"  symbol: {doc.meta.symbol}")
     parts.append(f"  logical_name: {doc.meta.logical_name}")
     parts.append(f"  physical_name: {doc.meta.physical_name}")
     parts.append(f"  description: {doc.meta.description}")

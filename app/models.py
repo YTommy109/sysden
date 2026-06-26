@@ -15,7 +15,7 @@ class Column(BaseModel):
 
 
 class TableMeta(BaseModel):
-    symbol: str = ""
+    symbol: str | None = None
     logical_name: str
     physical_name: str
     description: str
