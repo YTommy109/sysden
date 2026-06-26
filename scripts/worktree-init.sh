@@ -32,6 +32,11 @@ if [ ! -e "$(pwd)/.data" ] && [ -e "$DATA_DIR" ]; then
   ln -sfn "$DATA_DIR" "$(pwd)/.data"
 fi
 
+# .dagaynignore はシンボリックリンク（除外設定を共有）
+if [ ! -e "$(pwd)/.dagaynignore" ] && [ -e "$ROOT/.dagaynignore" ]; then
+  ln -sfn "$ROOT/.dagaynignore" "$(pwd)/.dagaynignore"
+fi
+
 # .dagayn はコピー（ビルド済みグラフを再利用）
 if [ ! -e "$(pwd)/.dagayn" ] && [ -e "$ROOT/.dagayn" ]; then
   cp -r "$ROOT/.dagayn" "$(pwd)/.dagayn"
