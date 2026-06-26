@@ -26,6 +26,11 @@ def _write_next_id(next_id: int) -> None:
 
 
 def allocate_table_symbol() -> str:
+    """テーブルシンボル（TABLE_NNNN）を採番して返す。
+
+    Returns:
+        新規に採番されたテーブルシンボル文字列。
+    """
     next_id = _read_next_id()
     symbol = f"TABLE_{next_id:04d}"
     _write_next_id(next_id + 1)
@@ -34,6 +39,14 @@ def allocate_table_symbol() -> str:
 
 
 def allocate_column_symbols(count: int) -> list[str]:
+    """指定数のカラムシンボル（COLUMN_NNNN）リストを生成する。
+
+    Args:
+        count: 生成するシンボルの数。
+
+    Returns:
+        カラムシンボル文字列のリスト。
+    """
     return [f"COLUMN_{i:04d}" for i in range(1, count + 1)]
 
 
@@ -43,6 +56,16 @@ def remap_placeholders(
     *,
     table_symbols: list[str] | None = None,
 ) -> list[ToonDocument]:
+    """設計ドキュメント内のプレースホルダーシンボルを実シンボルに置換する。
+
+    Args:
+        designs: 置換対象の ToonDocument リスト。
+        symbol_map: プレースホルダー → 実シンボルの対応表。
+        table_symbols: 各ドキュメントに割り当てるテーブルシンボル。
+
+    Returns:
+        シンボルが置換された ToonDocument のリスト。
+    """
     result: list[ToonDocument] = []
     for i, doc in enumerate(designs):
         meta = doc.meta

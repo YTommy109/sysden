@@ -197,5 +197,5 @@ class TestAiServiceLogging:
                 prompt="テスト", current=current, rules=[], existing_tables=[]
             )
 
-        assert "AI コア設計更新失敗" in caplog.text
-        assert "stub_table" in caplog.text
+        assert "AI コア設計更新: table=stub_table" in caplog.text
+        assert "失敗" in caplog.text

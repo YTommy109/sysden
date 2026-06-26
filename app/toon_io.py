@@ -61,8 +61,7 @@ def _parse_sections(text: str) -> list[tuple[str, str, list[str] | None, list[st
 def _parse_kv_lines(lines: list[str]) -> dict[str, str]:
     result: dict[str, str] = {}
     for line in lines:
-        m = _KV_RE.match(line)
-        if m:
+        if m := _KV_RE.match(line):
             result[m.group(1)] = m.group(2).strip()
     return result
 
@@ -102,6 +101,14 @@ def _parse_text_block(lines: list[str]) -> str:
 
 
 def parse_table_toon(text: str) -> ToonDocument:
+    """TOON テキストをパースしてテーブルドキュメントを生成する。
+
+    Args:
+        text: TOON 形式のテキスト。
+
+    Returns:
+        パース結果の ToonDocument。
+    """
     sections = _parse_sections(text)
     meta_dict: dict[str, str] = {}
     columns: list[Column] = []
@@ -110,22 +117,31 @@ def parse_table_toon(text: str) -> ToonDocument:
     dao: list[dict[str, str]] | None = None
 
     for name, _header, fields, lines in sections:
-        if name == "meta":
-            meta_dict = _parse_kv_lines(lines)
-        elif name == "columns" and fields:
-            columns = [Column(**row) for row in _parse_array_rows(fields, lines)]
-        elif name == "logical" and fields:
-            logical = _parse_array_rows(fields, lines)
-        elif name == "physical" and fields:
-            physical = _parse_array_rows(fields, lines)
-        elif name == "dao" and fields:
-            dao = _parse_array_rows(fields, lines)
+        match name:
+            case "meta":
+                meta_dict = _parse_kv_lines(lines)
+            case "columns" if fields:
+                columns = [Column(**row) for row in _parse_array_rows(fields, lines)]
+            case "logical" if fields:
+                logical = _parse_array_rows(fields, lines)
+            case "physical" if fields:
+                physical = _parse_array_rows(fields, lines)
+            case "dao" if fields:
+                dao = _parse_array_rows(fields, lines)
 
     meta = TableMeta(**meta_dict)
     return ToonDocument(meta=meta, columns=columns, logical=logical, physical=physical, dao=dao)
 
 
 def parse_index_toon(text: str) -> IndexDocument:
+    """TOON テキストをパースしてインデックスドキュメントを生成する。
+
+    Args:
+        text: インデックス TOON 形式のテキスト。
+
+    Returns:
+        パース結果の IndexDocument。
+    """
     sections = _parse_sections(text)
     description = ""
     rules: list[str] = []
@@ -133,20 +149,31 @@ def parse_index_toon(text: str) -> IndexDocument:
     er_diagram = ""
 
     for name, _header, fields, lines in sections:
-        if name == "meta":
-            kv = _parse_kv_lines(lines)
-            description = kv.get("description", "")
-        elif name == "rules":
-            rules = _parse_list_lines(lines)
-        elif name == "tables" and fields:
-            tables = [TableSummary(**row) for row in _parse_array_rows(fields, lines)]
-        elif name == "er_diagram":
-            er_diagram = _parse_text_block(lines)
+        match name:
+            case "meta":
+                kv = _parse_kv_lines(lines)
+                description = kv.get("description", "")
+            case "rules":
+                rules = _parse_list_lines(lines)
+            case "tables" if fields:
+                tables = [TableSummary(**row) for row in _parse_array_rows(fields, lines)]
+            case "er_diagram":
+                er_diagram = _parse_text_block(lines)
 
     return IndexDocument(description=description, rules=rules, tables=tables, er_diagram=er_diagram)
 
 
 def parse_toon_tables(text: str) -> list[ToonDocument]:
+    """複数テーブルを含む TOON テキストをパースする。
+
+    ``meta:`` の出現位置でテキストを分割し、各チャンクを個別にパースする。
+
+    Args:
+        text: 複数テーブル定義を含む TOON テキスト。
+
+    Returns:
+        パースされた ToonDocument のリスト。
+    """
     chunks: list[str] = []
     current_lines: list[str] = []
     seen_meta = False
@@ -175,6 +202,14 @@ def _serialize_array_section(name: str, fields: list[str], rows: list[dict[str, 
 
 
 def serialize_table_toon(doc: ToonDocument) -> str:
+    """ToonDocument を TOON テキストにシリアライズする。
+
+    Args:
+        doc: シリアライズ対象の ToonDocument。
+
+    Returns:
+        TOON 形式のテキスト。
+    """
     parts: list[str] = []
 
     parts.append("meta:")
@@ -207,6 +242,14 @@ def serialize_table_toon(doc: ToonDocument) -> str:
 
 
 def serialize_index_toon(index: IndexDocument) -> str:
+    """IndexDocument を TOON テキストにシリアライズする。
+
+    Args:
+        index: シリアライズ対象の IndexDocument。
+
+    Returns:
+        インデックス TOON 形式のテキスト。
+    """
     parts: list[str] = []
 
     parts.append("meta:")
@@ -233,6 +276,17 @@ def serialize_index_toon(index: IndexDocument) -> str:
 
 
 def read_toon(name: str) -> ToonDocument:
+    """テーブルの TOON ファイルを読み込んでパースする。
+
+    Args:
+        name: テーブル名。
+
+    Returns:
+        パース結果の ToonDocument。
+
+    Raises:
+        FileNotFoundError: 指定テーブルのファイルが存在しない場合。
+    """
     path = get_data_dir() / f"{name}.toon"
     if not path.exists():
         raise FileNotFoundError(f"Table '{name}' not found")
@@ -241,6 +295,12 @@ def read_toon(name: str) -> ToonDocument:
 
 
 def write_toon(name: str, doc: ToonDocument) -> None:
+    """ToonDocument を TOON ファイルに書き込む。
+
+    Args:
+        name: テーブル名。
+        doc: 書き込む ToonDocument。
+    """
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{name}.toon"
@@ -249,6 +309,13 @@ def write_toon(name: str, doc: ToonDocument) -> None:
 
 
 def read_index_toon() -> IndexDocument:
+    """インデックス TOON ファイルを読み込む。
+
+    ファイルが存在しない場合はデフォルト値の IndexDocument を返す。
+
+    Returns:
+        インデックスの IndexDocument。
+    """
     path = get_data_dir() / f"{_INDEX_STEM}.toon"
     if not path.exists():
         return IndexDocument(
@@ -259,6 +326,11 @@ def read_index_toon() -> IndexDocument:
 
 
 def write_index_toon(doc: IndexDocument) -> None:
+    """IndexDocument をインデックス TOON ファイルに書き込む。
+
+    Args:
+        doc: 書き込む IndexDocument。
+    """
     d = get_data_dir()
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"{_INDEX_STEM}.toon"
