@@ -14,7 +14,7 @@ def _read_next_id() -> int:
     path = get_data_dir() / _INDEX_YAML
     if not path.exists():
         return 1
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return int(data.get("next_table_id", 1))
 
 
