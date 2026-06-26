@@ -22,7 +22,6 @@ jobs:
               - 'tests/**'
               - 'templates/**'
               - 'static/**'
-              - 'scripts/**'
               - 'prompts/**'
               - 'pyproject.toml'
               - 'uv.lock'

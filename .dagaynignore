@@ -1,0 +1,7 @@
+# .gitignore にあるが dagayn デフォルト除外に含まれないもの
+.data/**
+.superpowers/**
+.worktrees/**
+htmlcov/**
+.coverage
+.env
