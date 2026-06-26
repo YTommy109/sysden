@@ -4,6 +4,7 @@ import pytest
 
 from app import ai_service
 from app.models import TableSummary, ToonDocument
+from app.toon_io import parse_table_toon
 from tests.conftest import SAMPLE_CORE_TOON, make_fake_openai_client
 
 MULTI_TABLE_RESPONSE = """\
@@ -75,7 +76,6 @@ def test_テーブル更新(monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     fake = make_fake_openai_client(response=SINGLE_TABLE_RESPONSE)
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
-    from app.toon_io import parse_table_toon
 
     current = parse_table_toon(SINGLE_TABLE_RESPONSE)
 
@@ -101,7 +101,6 @@ def test_更新モードで現在のコア設計がプロンプトに含まれ�
         response=SINGLE_TABLE_RESPONSE, calls=calls
     )
     monkeypatch.setattr(ai_service, "get_client", lambda: fake)
-    from app.toon_io import parse_table_toon
 
     current = parse_table_toon(SINGLE_TABLE_RESPONSE)
 
