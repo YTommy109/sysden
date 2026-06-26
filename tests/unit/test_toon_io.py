@@ -70,7 +70,7 @@ def test_ToonDocumentを生成できる() -> None:
     assert len(doc.columns) == 1
     assert doc.logical is None
     assert doc.physical is None
-    assert doc.doa is None
+    assert doc.dao is None
 
 
 def test_IndexDocumentを生成できる() -> None:
@@ -124,7 +124,7 @@ logical[1]{カラム名,型,ユニーク,説明}:
 physical[1]{column_name,type,nullable,pk,unique,default,description}:
   id,uuid,NO,YES,YES,,主キー
 
-doa[1]{column_name,python_type,required,min,max,max_length,description}:
+dao[1]{column_name,python_type,required,min,max,max_length,description}:
   id,UUID,YES,,,,主キー
 """
 
@@ -188,8 +188,8 @@ def test_導出セクション付きTOONをパースする() -> None:
     assert doc.logical[0]["カラム名"] == "識別子"
     assert doc.physical is not None
     assert doc.physical[0]["column_name"] == "id"
-    assert doc.doa is not None
-    assert doc.doa[0]["python_type"] == "UUID"
+    assert doc.dao is not None
+    assert doc.dao[0]["python_type"] == "UUID"
 
 
 def test_インデックスTOONをパースする() -> None:

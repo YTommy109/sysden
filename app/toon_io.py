@@ -107,7 +107,7 @@ def parse_table_toon(text: str) -> ToonDocument:
     columns: list[Column] = []
     logical: list[dict[str, str]] | None = None
     physical: list[dict[str, str]] | None = None
-    doa: list[dict[str, str]] | None = None
+    dao: list[dict[str, str]] | None = None
 
     for name, _header, fields, lines in sections:
         if name == "meta":
@@ -118,11 +118,11 @@ def parse_table_toon(text: str) -> ToonDocument:
             logical = _parse_array_rows(fields, lines)
         elif name == "physical" and fields:
             physical = _parse_array_rows(fields, lines)
-        elif name == "doa" and fields:
-            doa = _parse_array_rows(fields, lines)
+        elif name == "dao" and fields:
+            dao = _parse_array_rows(fields, lines)
 
     meta = TableMeta(**meta_dict)
-    return ToonDocument(meta=meta, columns=columns, logical=logical, physical=physical, doa=doa)
+    return ToonDocument(meta=meta, columns=columns, logical=logical, physical=physical, dao=dao)
 
 
 def parse_index_toon(text: str) -> IndexDocument:
@@ -198,10 +198,10 @@ def serialize_table_toon(doc: ToonDocument) -> str:
         parts.append("")
         parts.append(_serialize_array_section("physical", fields, doc.physical))
 
-    if doc.doa is not None:
-        fields = list(doc.doa[0].keys()) if doc.doa else []
+    if doc.dao is not None:
+        fields = list(doc.dao[0].keys()) if doc.dao else []
         parts.append("")
-        parts.append(_serialize_array_section("doa", fields, doc.doa))
+        parts.append(_serialize_array_section("dao", fields, doc.dao))
 
     return "\n".join(parts) + "\n"
 

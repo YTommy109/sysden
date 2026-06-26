@@ -11,16 +11,16 @@
 
 <div class="tabs" style="display:flex; gap:0.5rem; margin:1rem 0 0.5rem;">
   <button class="tab active"
-    _="on click add .active to me remove .active from .tab in .tabs then show #logical hide #physical hide #doa">論理設計</button>
+    _="on click add .active to me remove .active from .tab in .tabs then show #logical hide #physical hide #dao">論理設計</button>
   <button class="tab"
-    _="on click add .active to me remove .active from .tab in .tabs then hide #logical show #physical hide #doa">物理設計</button>
+    _="on click add .active to me remove .active from .tab in .tabs then hide #logical show #physical hide #dao">物理設計</button>
   <button class="tab"
-    _="on click add .active to me remove .active from .tab in .tabs then hide #logical hide #physical show #doa">DoA</button>
+    _="on click add .active to me remove .active from .tab in .tabs then hide #logical hide #physical show #dao">DAO</button>
 </div>
 
 <div id="logical">{{ logical_html | safe }}</div>
 <div id="physical" style="display:none;">{{ physical_html | safe }}</div>
-<div id="doa" style="display:none;">{{ doa_html | safe }}</div>
+<div id="dao" style="display:none;">{{ dao_html | safe }}</div>
 
 <h2>AI に更新を依頼</h2>
 <form method="post" action="/api/tables/{{ name }}"

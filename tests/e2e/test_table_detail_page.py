@@ -75,7 +75,7 @@ class TestTableDetailDisplay:
         tab = page.locator(".tabs button", has_text="物理設計")
         expect(tab).to_be_visible()
 
-    def test_DoAタブが表示される(
+    def test_DAOタブが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブルが存在する
@@ -84,8 +84,8 @@ class TestTableDetailDisplay:
         # When: 詳細ページにアクセスする
         page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
-        # Then: DoA タブが存在する
-        tab = page.locator(".tabs button", has_text="DoA")
+        # Then: DAO タブが存在する
+        tab = page.locator(".tabs button", has_text="DAO")
         expect(tab).to_be_visible()
 
     def test_論理設計が初期表示される(
@@ -162,18 +162,18 @@ class TestTabSwitching:
         expect(page.locator("#physical")).to_be_visible()
         expect(page.locator("#logical")).to_be_hidden()
 
-    def test_DoAタブクリックでDoAが表示される(
+    def test_DAOタブクリックでDAOが表示される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
         # Given: テーブルが存在し詳細ページを表示中
         create_table()
         page.goto(f"{base_url}/tables/{_TABLE_NAME}")
 
-        # When: DoA タブをクリックする
-        page.locator(".tabs button", has_text="DoA").click()
+        # When: DAO タブをクリックする
+        page.locator(".tabs button", has_text="DAO").click()
 
-        # Then: DoA が表示され他が非表示になる
-        expect(page.locator("#doa")).to_be_visible()
+        # Then: DAO が表示され他が非表示になる
+        expect(page.locator("#dao")).to_be_visible()
         expect(page.locator("#logical")).to_be_hidden()
         expect(page.locator("#physical")).to_be_hidden()
 

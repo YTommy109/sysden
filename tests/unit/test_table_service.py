@@ -182,51 +182,51 @@ def test_物理設計でサロゲートキーと操作記録が付与される()
         ("timestamptz", "datetime"),
     ],
 )
-def test_DoAでSQL型がPython型に変換される(sql_type: str, expected_python_type: str) -> None:
+def test_DAOでSQL型がPython型に変換される(sql_type: str, expected_python_type: str) -> None:
     # Arrange
     col = _make_column(type=sql_type, physical_name="test_col")
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_doa(doc)
+    result = table_service.derive_dao(doc)
 
     # Assert — index 0 is surrogate key "id", index 1 is the column
     assert result[1]["python_type"] == expected_python_type
 
 
-def test_DoAでvarcharのmax_lengthが抽出される() -> None:
+def test_DAOでvarcharのmax_lengthが抽出される() -> None:
     # Arrange
     col = _make_column(type="varchar(100)", physical_name="name")
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_doa(doc)
+    result = table_service.derive_dao(doc)
 
     # Assert — index 1 is the column
     assert result[1]["max_length"] == "100"
 
 
-def test_DoAでnullableがrequiredに変換される() -> None:
+def test_DAOでnullableがrequiredに変換される() -> None:
     # Arrange
     col_required = _make_column(nullable="NO")
     col_optional = _make_column(nullable="YES")
     doc = _make_doc(col_required, col_optional)
 
     # Act
-    result = table_service.derive_doa(doc)
+    result = table_service.derive_dao(doc)
 
     # Assert — index 0 is surrogate key, indices 1 and 2 are the columns
     assert result[1]["required"] == "YES"
     assert result[2]["required"] == "NO"
 
 
-def test_DoAでサロゲートキーと操作記録が付与される() -> None:
+def test_DAOでサロゲートキーと操作記録が付与される() -> None:
     # Arrange
     col = _make_column(physical_name="name", type="varchar(100)")
     doc = _make_doc(col)
 
     # Act
-    result = table_service.derive_doa(doc)
+    result = table_service.derive_dao(doc)
 
     # Assert
     assert result[0]["column_name"] == "id"
@@ -246,10 +246,10 @@ def test_derive_allで3セクションが追加される() -> None:
     # Assert — 1 user column + 1 surrogate key + 3 operation timestamps = 5
     assert result.logical is not None
     assert result.physical is not None
-    assert result.doa is not None
+    assert result.dao is not None
     assert len(result.logical) == 1
     assert len(result.physical) == 5
-    assert len(result.doa) == 5
+    assert len(result.dao) == 5
 
 
 # ── CRUD ──

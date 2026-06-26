@@ -52,7 +52,7 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
 
     logical_html = ""
     physical_html = ""
-    doa_html = ""
+    dao_html = ""
 
     if doc.logical:
         logical_html = _md.render(_dict_list_to_markdown_table(doc.logical))
@@ -62,8 +62,8 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
         )
     if doc.physical:
         physical_html = _md.render(_dict_list_to_markdown_table(doc.physical))
-    if doc.doa:
-        doa_html = _md.render(_dict_list_to_markdown_table(doc.doa))
+    if doc.dao:
+        dao_html = _md.render(_dict_list_to_markdown_table(doc.dao))
 
     return templates.TemplateResponse(
         request,
@@ -74,6 +74,6 @@ def table_detail(name: str, request: Request) -> HTMLResponse:
             "symbol": doc.meta.symbol,
             "logical_html": logical_html,
             "physical_html": physical_html,
-            "doa_html": doa_html,
+            "dao_html": dao_html,
         },
     )

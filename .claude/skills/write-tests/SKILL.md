@@ -5,18 +5,20 @@ description: テストコード（unit / integration / E2E）を追加・修正�
 
 # sysden テストスキル
 
-`tests/` 配下のテストコードを追加・修正するときの規約。
+`tests/` 配下のテストコードを追加・修正するときに使う。
 
-## 開発フロー（テスト先行）
+## 規約
 
-- 新機能追加・仕様変更では、**先にテストを書き、そのテストを通す実装を行う**
-- テストがすべてグリーンになった時点でタスク完了とみなす
-- **不具合を確認したとき**: 先に落ちる回帰テストを追加してから修正する
-- リファクタリングでは先に既存挙動をテストで固定してからコードを変更する
-- テストの優先順位:
-  1. 代表的なユーザーフローは Playwright E2E
-  2. HTML 構造・API のステータスコードは FastAPI `TestClient` 統合テスト
-  3. ドメインロジック単体は pytest ユニットテスト
+[docs/coding_rule.md のテスト規約](../../../docs/coding_rule.md#テスト規約)をすべて遵守すること。
+
+主要な規約:
+
+- テスト先行（TDD）で開発する
+- テスト関数名は日本語で付ける（`test_<日本語の動作説明>`）
+- unittest より pytest を優先（`monkeypatch` / `pytest.fixture`）
+- `@pytest.mark.parametrize` を積極的に使う
+- ユニットテストは AAA スタイル、統合・E2E テストは Gherkin スタイル
+- `caplog` でプロダクトコードのログ出力を検証する
 
 ## 作業フェーズ
 
@@ -27,157 +29,3 @@ description: テストコード（unit / integration / E2E）を追加・修正�
    - `@pytest.mark.parametrize` を使うべき箇所がないか（同じロジックを複数入力で検証するテスト）
    - テストケースの網羅性は十分か（正常系・異常系・境界値が揃っているか）
    - parametrize に変換した場合、既存テストが壊れないことを確認する
-
-## テスト関数の命名規約
-
-- テスト関数名は**何をテストしているかがわかる簡潔な日本語**で付ける
-- 形式: `test_<日本語の動作説明>`（スネークケース・ローマ字ではなく日本語そのまま）
-- クラス名は `Test<対象><カテゴリ>` の英語のまま
-
-```python
-# ✅ 良い例: 何をテストしているか一目でわかる
-def test_テーブル名が空なら422を返す(client: TestClient) -> None: ...
-def test_AI生成結果をTSVに保存する(mock_openai: None) -> None: ...
-def test_存在しないテーブルの詳細は404(client: TestClient) -> None: ...
-def test_マークダウンがHTMLに変換される() -> None: ...
-
-# ❌ 悪い例: 英語で長くなり意図が読みにくい
-def test_create_table_with_empty_name_returns_422(): ...
-def test_ai_generated_result_is_saved_to_tsv(): ...
-```
-
-- parametrize と組み合わせる場合も日本語で:
-
-```python
-@pytest.mark.parametrize("name", ["", "123", "A-B", "a" * 65])
-def test_不正なテーブル名は422を返す(client: TestClient, name: str) -> None: ...
-```
-
-## 共通規約
-
-- **unittest より pytest を優先**: `unittest.mock.patch` / `MagicMock` ではなく `monkeypatch` / `pytest.fixture` を使う
-- pytest fixture が適したところでは積極的に活用する（テストデータ、モック注入など）
-- **`@pytest.mark.parametrize` を積極的に使う**: 入力パターンが 2 つ以上ある関数テストは parametrize で書く
-- `uv run pytest tests/unit -q` は 60 秒以内に完了すること
-
-### parametrize の使い方
-
-同じアサーション構造で入力だけが異なるテストは個別関数にせず parametrize にまとめる:
-
-```python
-@pytest.mark.parametrize(
-    ("input_type", "expected"),
-    [
-        ("VARCHAR", "文字列"),
-        ("INTEGER", "整数"),
-        ("BOOLEAN", "真偽値"),
-        ("UNKNOWN", "UNKNOWN"),  # マッチしない場合はそのまま返す
-    ],
-)
-def test_translate_type(input_type: str, expected: str) -> None:
-    assert _translate_type(input_type) == expected
-```
-
-parametrize を使うべき典型的なケース:
-- 複数の有効入力に対して同じ正常結果を期待する
-- 複数の無効入力に対して同じエラー（ステータスコード / 例外）を期待する
-- 境界値テスト（最小・最大・境界+1）
-- 型変換・マッピングのテスト
-
-## テスト時のロギング確認
-
-- プロダクトコードが適切なログを出しているかをテストで検証する
-- `caplog` fixture でログ出力をキャプチャし、期待するメッセージが記録されていることを確認する
-- 特にエラーパスでは、LLM が調査しやすいログ（操作・入力値・結果がセットで記録されている）が出ることを検証する
-
-```python
-def test_AI生成失敗時にテーブル名をログ出力する(caplog: pytest.LogCaptureFixture) -> None:
-    with caplog.at_level(logging.ERROR):
-        with pytest.raises(OpenAIError):
-            generate_table_design("users", "テスト")
-
-    assert "table=users" in caplog.text
-```
-
-## ユニットテスト（`tests/unit/`）
-
-- AAA（Arrange-Act-Assert）スタイルで空行ブロック分けする
-- 外部依存なし（ファイル I/O は `tmp_path` fixture で一時ディレクトリに隔離）
-- ai_service のテストでは OpenAI SDK をモック（`monkeypatch` + スタブクライアント）する
-
-```python
-def test_write_and_read_tsv(sample_tsv: str) -> None:
-    # Arrange
-    table_service.write_tsv("users", sample_tsv)
-
-    # Act
-    rows = table_service.read_tsv("users")
-
-    # Assert
-    assert rows[0]["column_name"] == "id"
-```
-
-## インテグレーションテスト（`tests/integration/`）
-
-- FastAPI `TestClient` + 一時データディレクトリ（`conftest.py` の `tmp_data_dir` fixture）
-- Gherkin（Given-When-Then）スタイルで空行ブロック分けする
-
-```python
-def test_create_table_via_ai(client: TestClient, mock_openai: None) -> None:
-    # Given: AI モックが TSV を返す状態でアプリが起動している
-
-    # When: テーブル作成 API にリクエストを送る
-    resp = client.post(
-        "/api/tables",
-        data={"name": "users", "prompt": "ユーザーテーブルを作って"},
-        follow_redirects=True,
-    )
-
-    # Then: 200 が返りテーブル名がレスポンスに含まれる
-    assert resp.status_code == 200
-    assert "users" in resp.text
-```
-
-## E2E テスト（`tests/e2e/`）
-
-### スコープ・方針
-
-- ルーターが配線済みの画面のみテスト対象とする
-- BE 内部仕様の網羅性は不要。FE 部品の網羅性を重視する
-- 新しい画面・ルーターを追加したら、対応する E2E テストファイルも追加する
-
-### スタイル
-
-- **Gherkin (Given-When-Then)** コメントで各テストの意図を明示し、空行でブロック分けする
-- クラスで論理グループ化: `Test<Page><Category>` (例: `TestIndexPageEmpty`, `TestCreateTableForm`)
-- 関数名: `test_<日本語の動作説明>`（「テスト関数の命名規約」セクション参照）
-- ファイル: `test_<page_name>.py`（ページ単位）、`test_navigation.py`（ページ間遷移フロー）
-
-### AI モック
-
-- `SYSDEN_TEST_MODE=1` 環境変数で `ai_service` をスタブ化する。実際の API は呼ばない
-- サーバーは `tests/e2e/conftest.py` の session スコープ fixture でサブプロセス起動する
-
-### データ分離
-
-- 各テスト前に `SYSDEN_DATA` 内の TSV を削除する autouse fixture `clean_data` でテスト間の独立性を保証する
-- テスト前提条件は `create_table` fixture（httpx POST）で API 経由で作成する
-
-### FE 部品チェックリスト（各画面で網羅すること）
-
-- 全 UI 要素の存在確認（ボタン、リンク、フォーム、入力欄、見出し）
-- 空状態のメッセージ表示 / 非表示
-- ボタン・リンクの属性（href, action, hx-* の結果）
-- フォーム送信後の遷移先
-- HTML バリデーション（required 属性）
-- htmx インタラクション（hx-delete + hx-confirm、DOM 更新）
-- ナビゲーションバーのリンク
-- ページタイトル (`<title>`)
-
-### 実行コマンド
-
-```bash
-uv run task e2e           # E2E のみ
-uv run pytest tests/e2e -v --headed  # ブラウザ表示ありデバッグ
-uv run task test          # 全テスト（unit + integration + e2e）
-```
