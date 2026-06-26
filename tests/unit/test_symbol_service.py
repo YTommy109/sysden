@@ -78,20 +78,19 @@ def test_既存のindex_yamlから採番を継続する(
     assert data["next_table_id"] == 6
 
 
-def test_カラムシンボルを生成する() -> None:
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (3, ["COLUMN_0001", "COLUMN_0002", "COLUMN_0003"]),
+        (0, []),
+    ],
+)
+def test_カラムシンボルの生成(count: int, expected: list[str]) -> None:
     # Act
-    symbols = symbol_service.allocate_column_symbols(3)
+    symbols = symbol_service.allocate_column_symbols(count)
 
     # Assert
-    assert symbols == ["COLUMN_0001", "COLUMN_0002", "COLUMN_0003"]
-
-
-def test_カラムシンボル0個は空リスト() -> None:
-    # Act
-    symbols = symbol_service.allocate_column_symbols(0)
-
-    # Assert
-    assert symbols == []
+    assert symbols == expected
 
 
 def test_プレースホルダをリマップする() -> None:
