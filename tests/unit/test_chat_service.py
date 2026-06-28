@@ -1,9 +1,12 @@
+import asyncio
 import logging
+from pathlib import Path
 
 import pytest
 
 from app import chat_service
-from app.models import ChatAction
+from app.models import ChatAction, IndexDocument, TableSummary
+from tests.conftest import SAMPLE_CORE_TOON, make_fake_openai_client
 
 
 class TestConversationPersistence:
@@ -70,3 +73,145 @@ class TestConversationPersistence:
 
         # Assert
         assert f"new_conv={conv.id}" in caplog.text
+
+
+class TestToonExtraction:
+    def test_応答テキストからTOONブロックを抽出する(self) -> None:
+        # Arrange
+        text = (
+            "ユーザーテーブルを作成しました。\n\n"
+            "meta:\n"
+            "  logical_name: ユーザー\n"
+            "  physical_name: users\n"
+            "  description: ユーザー管理\n"
+            "\n"
+            "columns[1]{symbol,logical_name,physical_name,type,"
+            "nullable,pk,unique,default,fk_target,description}:\n"
+            "  COLUMN_0001,識別子,id,uuid,NO,YES,YES,gen_random_uuid(),,主キー\n"
+            "\n"
+            "以上です。"
+        )
+
+        # Act
+        blocks = chat_service.extract_toon_blocks(text)
+
+        # Assert
+        assert len(blocks) == 1
+        assert "meta:" in blocks[0]
+        assert "columns[1]" in blocks[0]
+
+    def test_TOONブロックがない応答は空リストを返す(self) -> None:
+        # Arrange
+        text = "テーブル設計について質問があればお聞きください。"
+
+        # Act
+        blocks = chat_service.extract_toon_blocks(text)
+
+        # Assert
+        assert blocks == []
+
+
+class TestIdentifyRelevantTables:
+    def test_関連テーブル名をJSON配列で返す(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Arrange
+        fake_response = '["users", "orders"]'
+        fake = make_fake_openai_client(response=fake_response)
+        monkeypatch.setattr("app.chat_service.ai_service.get_client", lambda: fake)
+        index = IndexDocument(
+            description="",
+            rules=[],
+            tables=[
+                TableSummary(
+                    symbol="TABLE_0001",
+                    name="users",
+                    logical_name="ユーザー",
+                    description="",
+                ),
+                TableSummary(
+                    symbol="TABLE_0002",
+                    name="orders",
+                    logical_name="注文",
+                    description="",
+                ),
+            ],
+            er_diagram="",
+        )
+
+        # Act
+        result = chat_service.identify_relevant_tables("注文テーブルにFK追加", index)
+
+        # Assert
+        assert result == ["users", "orders"]
+
+    def test_テーブル操作なしなら空リストを返す(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Arrange
+        fake = make_fake_openai_client(response="[]")
+        monkeypatch.setattr("app.chat_service.ai_service.get_client", lambda: fake)
+        index = IndexDocument(description="", rules=[], tables=[], er_diagram="")
+
+        # Act
+        result = chat_service.identify_relevant_tables("こんにちは", index)
+
+        # Assert
+        assert result == []
+
+
+class TestApplyTableActions:
+    def test_新規テーブルのTOONブロックを保存する(self) -> None:
+        # Arrange
+        toon_blocks = [SAMPLE_CORE_TOON]
+        index = IndexDocument(description="", rules=[], tables=[], er_diagram="")
+
+        # Act
+        actions = chat_service.apply_table_actions(toon_blocks, index)
+
+        # Assert
+        assert len(actions) == 1
+        assert actions[0].type == "create_table"
+        assert actions[0].table_name == "stub_table"
+
+    def test_既存テーブルのTOONブロックで更新する(self, tmp_path: Path) -> None:
+        # Arrange — 先に既存テーブルを作成
+        from app import table_service
+        from app.derive_service import derive_all
+        from app.toon_io import parse_table_toon
+
+        doc = parse_table_toon(SAMPLE_CORE_TOON)
+        doc = doc.model_copy(update={"meta": doc.meta.model_copy(update={"symbol": "TABLE_0001"})})
+        doc = derive_all(doc)
+        table_service.save_table("stub_table", doc)
+        table_service.rebuild_index()
+
+        index = table_service.get_index()
+        toon_blocks = [SAMPLE_CORE_TOON]
+
+        # Act
+        actions = chat_service.apply_table_actions(toon_blocks, index)
+
+        # Assert
+        assert len(actions) == 1
+        assert actions[0].type == "update_table"
+
+
+class TestGenerateResponseStream:
+    def test_テストモードでスタブ応答をストリーミングする(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Arrange
+        monkeypatch.setenv("SYSDEN_TEST_MODE", "1")
+        conv = chat_service.reset_conversation()
+        chat_service.add_user_message(conv, "テーブルを作って")
+
+        # Act
+        chunks: list[str] = []
+
+        async def collect() -> None:
+            async for chunk in chat_service.generate_response_stream(conv):
+                chunks.append(chunk)
+
+        asyncio.run(collect())
+
+        # Assert
+        full = "".join(chunks)
+        assert "meta:" in full
+        assert "columns[" in full
