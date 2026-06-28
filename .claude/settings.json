@@ -8,10 +8,38 @@
       "Bash(uv run ty:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(gh pr:*)",
+      "Bash(gh issue:*)",
+      "Bash(dagayn:*)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "filepath=\"$TOOL_INPUT_FILE_PATH$TOOL_INPUT_file_path\"; if echo \"$filepath\" | grep -qE '(^|/).env$'; then echo 'BLOCK: .env は手動で編集してください'; exit 2; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "filepath=\"$TOOL_INPUT_FILE_PATH$TOOL_INPUT_file_path\"; if [ -n \"$filepath\" ] && echo \"$filepath\" | grep -q '.py$'; then uv run ruff check --fix -q \"$filepath\"; uv run ruff format -q \"$filepath\"; fi",
+            "statusMessage": "Ruff auto-format..."
+          }
+        ]
+      }
+    ],
     "WorktreeCreate": [
       {
         "hooks": [
