@@ -41,3 +41,21 @@ class IndexDocument(BaseModel):
     rules: list[str]
     tables: list[TableSummary]
     er_diagram: str
+
+
+class ChatAction(BaseModel):
+    type: str
+    table_name: str
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+    timestamp: str = ""
+    actions: list[ChatAction] = []
+
+
+class Conversation(BaseModel):
+    id: str
+    created_at: str
+    messages: list[ChatMessage] = []
