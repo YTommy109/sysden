@@ -3,6 +3,6 @@
 .superpowers/**
 .worktrees/**
 htmlcov/**
-.coverage
+.coverage*
 .env
 .ruff_cache/**
