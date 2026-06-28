@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -53,7 +54,7 @@ async def _handle_message(ws: WebSocket, content: str) -> None:
     chat_service.add_user_message(conv, content)
 
     index = read_index_toon()
-    relevant = chat_service.identify_relevant_tables(content, index)
+    relevant = await asyncio.to_thread(chat_service.identify_relevant_tables, content, index)
 
     context_toon = ""
     for name in relevant:
@@ -69,7 +70,7 @@ async def _handle_message(ws: WebSocket, content: str) -> None:
         await ws.send_json({"type": "stream", "content": chunk})
 
     toon_blocks = chat_service.extract_toon_blocks(full_response)
-    actions = chat_service.apply_table_actions(toon_blocks, index)
+    actions = await asyncio.to_thread(chat_service.apply_table_actions, toon_blocks, index)
 
     conv = chat_service.load_conversation()
     chat_service.add_assistant_message(conv, full_response, actions)
