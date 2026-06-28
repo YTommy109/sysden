@@ -50,41 +50,46 @@ async def _handle_message(ws: WebSocket, content: str) -> None:
         await ws.send_json({"type": "error", "message": "メッセージが空です"})
         return
 
-    conv = chat_service.load_conversation()
-    chat_service.add_user_message(conv, content)
+    try:
+        conv = chat_service.load_conversation()
+        chat_service.add_user_message(conv, content)
 
-    index = read_index_toon()
-    relevant = await asyncio.to_thread(chat_service.identify_relevant_tables, content, index)
+        index = read_index_toon()
+        relevant = await asyncio.to_thread(chat_service.identify_relevant_tables, content, index)
 
-    context_toon = ""
-    for name in relevant:
-        try:
-            doc = read_toon(name)
-            context_toon += serialize_table_toon(doc) + "\n\n"
-        except FileNotFoundError:
-            logger.warning("関連テーブルが見つからない: table=%s", name)
+        context_toon = ""
+        for name in relevant:
+            try:
+                doc = read_toon(name)
+                context_toon += serialize_table_toon(doc) + "\n\n"
+            except FileNotFoundError:
+                logger.warning("関連テーブルが見つからない: table=%s", name)
 
-    full_response = ""
-    async for chunk in chat_service.generate_response_stream(conv, context_toon):
-        full_response += chunk
-        await ws.send_json({"type": "stream", "content": chunk})
+        full_response = ""
+        async for chunk in chat_service.generate_response_stream(conv, context_toon):
+            full_response += chunk
+            await ws.send_json({"type": "stream", "content": chunk})
 
-    toon_blocks = chat_service.extract_toon_blocks(full_response)
-    actions = await asyncio.to_thread(chat_service.apply_table_actions, toon_blocks, index)
+        toon_blocks = chat_service.extract_toon_blocks(full_response)
+        index = read_index_toon()
+        actions = await asyncio.to_thread(chat_service.apply_table_actions, toon_blocks, index)
 
-    conv = chat_service.load_conversation()
-    chat_service.add_assistant_message(conv, full_response, actions)
+        conv = chat_service.load_conversation()
+        chat_service.add_assistant_message(conv, full_response, actions)
 
-    await ws.send_json(
-        {
-            "type": "stream_end",
-            "content": full_response,
-            "actions": [a.model_dump() for a in actions],
-        }
-    )
+        await ws.send_json(
+            {
+                "type": "stream_end",
+                "content": full_response,
+                "actions": [a.model_dump() for a in actions],
+            }
+        )
 
-    if actions:
-        await ws.send_json({"type": "content_updated"})
+        if actions:
+            await ws.send_json({"type": "content_updated"})
+    except Exception:
+        logger.exception("メッセージ処理中にエラー発生")
+        await ws.send_json({"type": "error", "message": "処理中にエラーが発生しました"})
 
 
 async def _handle_reset(ws: WebSocket) -> None:

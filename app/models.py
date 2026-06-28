@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -44,12 +46,12 @@ class IndexDocument(BaseModel):
 
 
 class ChatAction(BaseModel):
-    type: str
+    type: Literal["create_table", "update_table"]
     table_name: str
 
 
 class ChatMessage(BaseModel):
-    role: str
+    role: Literal["user", "assistant"]
     content: str
     timestamp: str = ""
     actions: list[ChatAction] = []
