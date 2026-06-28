@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from pathlib import Path
 
 import pytest
 
@@ -153,6 +152,29 @@ class TestIdentifyRelevantTables:
         # Assert
         assert result == []
 
+    def test_JSONパース失敗時に警告ログを出力する(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Arrange
+        fake = make_fake_openai_client(response="not json")
+        monkeypatch.setattr("app.chat_service.ai_service.get_client", lambda: fake)
+        index = IndexDocument(
+            description="",
+            rules=[],
+            tables=[
+                TableSummary(symbol="TABLE_0001", name="t", logical_name="t", description=""),
+            ],
+            er_diagram="",
+        )
+
+        # Act
+        with caplog.at_level(logging.WARNING):
+            result = chat_service.identify_relevant_tables("テスト", index)
+
+        # Assert
+        assert result == []
+        assert "Stage 1 JSON パース失敗" in caplog.text
+
 
 class TestApplyTableActions:
     def test_新規テーブルのTOONブロックを保存する(self) -> None:
@@ -168,7 +190,19 @@ class TestApplyTableActions:
         assert actions[0].type == "create_table"
         assert actions[0].table_name == "stub_table"
 
-    def test_既存テーブルのTOONブロックで更新する(self, tmp_path: Path) -> None:
+    def test_新規テーブル作成時にログを出力する(self, caplog: pytest.LogCaptureFixture) -> None:
+        # Arrange
+        toon_blocks = [SAMPLE_CORE_TOON]
+        index = IndexDocument(description="", rules=[], tables=[], er_diagram="")
+
+        # Act
+        with caplog.at_level(logging.INFO):
+            chat_service.apply_table_actions(toon_blocks, index)
+
+        # Assert
+        assert "テーブル作成: table=stub_table" in caplog.text
+
+    def test_既存テーブルのTOONブロックで更新する(self) -> None:
         # Arrange — 先に既存テーブルを作成
         from app import table_service
         from app.derive_service import derive_all

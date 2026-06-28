@@ -18,8 +18,9 @@ button:hover { background: #2a2a4e; }
 .spinning { animation: spin 1s linear infinite; }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
 /* Chat panel */
-#chat-toggle-btn { background: transparent; border: none; cursor: pointer; padding: 0.25rem; color: #90caf9; }
-#chat-toggle-btn:hover { color: white; }
+#chat-toggle-btn { background: transparent; border: none; cursor: pointer; padding: 0.25rem; }
+#chat-toggle-btn img { filter: invert(0.75) sepia(1) saturate(3) hue-rotate(190deg); }
+#chat-toggle-btn:hover img { filter: invert(1); }
 #app-layout { display: flex; min-height: calc(100vh - 3rem); }
 #main-content { flex: 1; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
 body.chat-open #main-content { margin-right: 0; }

@@ -22,6 +22,17 @@ class TestChatToggle:
         # Then: チャットパネルが非表示になる
         expect(page.locator("#chat-panel")).to_be_hidden()
 
+    def test_チャットパネルのUI要素が存在する(self, page: Page, base_url: str) -> None:
+        # Given: チャットを開いた状態
+        page.goto(base_url)
+        page.click("#chat-toggle-btn")
+
+        # Then: 全 UI 要素が表示される
+        expect(page.locator("#chat-header")).to_contain_text("チャット")
+        expect(page.locator("#chat-input")).to_be_visible()
+        expect(page.locator('button[aria-label="送信"]')).to_be_visible()
+        expect(page.locator('button[aria-label="会話をリセット"]')).to_be_visible()
+
     def test_チャットの開閉状態がページ遷移後も維持される(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
