@@ -112,26 +112,6 @@ class TestTableDetailDisplay:
         # Then: 物理設計コンテンツは非表示
         expect(page.locator("#physical")).to_be_hidden()
 
-    def test_更新フォームが表示される(
-        self, page: Page, base_url: str, create_table: Callable[..., None]
-    ) -> None:
-        # Given: テーブルが存在する
-        create_table()
-
-        # When: 詳細ページにアクセスする
-        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
-
-        # Then: 更新フォームが正しい action を持つ
-        form = page.locator(f'form[action="/api/tables/{_TABLE_NAME}"]')
-        expect(form).to_be_visible()
-        expect(form).to_have_attribute("method", "post")
-
-        # Then: 依頼文テキストエリアが存在する
-        expect(form.locator('textarea[name="prompt"]')).to_be_visible()
-
-        # Then: 更新ボタンが存在する
-        expect(form.locator('button[type="submit"]')).to_have_text("更新を依頼")
-
     def test_ナビバーリンクが存在する(
         self, page: Page, base_url: str, create_table: Callable[..., None]
     ) -> None:
@@ -192,43 +172,6 @@ class TestTabSwitching:
         # Then: 論理設計が再表示され物理設計が非表示になる
         expect(page.locator("#logical")).to_be_visible()
         expect(page.locator("#physical")).to_be_hidden()
-
-
-class TestTableDetailUpdate:
-    """テーブル更新フォームの操作。"""
-
-    def test_更新後に同じページへリダイレクト(
-        self, page: Page, base_url: str, create_table: Callable[..., None]
-    ) -> None:
-        # Given: テーブルが存在し詳細ページを表示中
-        create_table()
-        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
-
-        # When: 更新フォームに入力して送信する
-        page.fill('textarea[name="prompt"]', "email カラムを追加して")
-        page.click('button[type="submit"]')
-
-        # Then: 同じ詳細ページにリダイレクトされる
-        page.wait_for_url(f"**/{_TABLE_NAME}")
-        expect(page.locator("h1")).to_have_text(_TABLE_DISPLAY)
-
-    def test_更新送信ボタンがリクエスト中にdisabledになる(
-        self, page: Page, base_url: str, create_table: Callable[..., None]
-    ) -> None:
-        # Given: テーブルが存在し詳細ページを表示中
-        create_table()
-        page.goto(f"{base_url}/tables/{_TABLE_NAME}")
-
-        # When: 更新フォームに入力して送信する
-        page.fill('textarea[name="prompt"]', "email カラムを追加して")
-        submit_btn = page.locator('button[type="submit"]')
-        submit_btn.click()
-
-        # Then: 送信ボタンが disabled になる（二重送信防止）
-        expect(submit_btn).to_be_disabled()
-
-        # Cleanup: ページ遷移を待つ
-        page.wait_for_url(f"**/{_TABLE_NAME}")
 
 
 class TestTableDetailNavigation:

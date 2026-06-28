@@ -7,11 +7,20 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-  <nav><a href="/">sysden</a></nav>
-  <div class="container" hx-ext="sse">{% block content %}{% endblock %}</div>
+  <nav>
+    <a href="/">sysden</a>
+    <button type="button" id="chat-toggle-btn" aria-label="チャットを開閉" title="チャットを開閉">
+      <img src="/static/icons/chat-bubble.svg" alt="" style="width:1.25rem; height:1.25rem;">
+    </button>
+  </nav>
+  <div id="app-layout">
+    <main id="main-content" hx-ext="sse">{% block content %}{% endblock %}</main>
+    {% include "_chat.html" %}
+  </div>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://unpkg.com/htmx-ext-sse@2/sse.js" defer></script>
   <script src="https://unpkg.com/hyperscript.org@0.9.14" defer></script>
   <script type="module" src="/static/js/mermaid-init.js"></script>
+  <script type="module" src="/static/js/chat.js"></script>
 </body>
 </html>

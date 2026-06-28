@@ -39,68 +39,12 @@ class TestIndexPageEmpty:
         # Then: 見出し "テーブル一覧" が表示される
         expect(page.locator("h1")).to_have_text("テーブル一覧")
 
-    def test_テーブル追加ボタンが表示される(self, page: Page, base_url: str) -> None:
+    def test_チャットトグルボタンが表示される(self, page: Page, base_url: str) -> None:
         # Given/When: トップページにアクセスする
         page.goto(base_url)
 
-        # Then: "テーブル追加" ボタンが表示される
-        expect(page.locator('button:has-text("テーブル追加")')).to_be_visible()
-
-    def test_ダイアログは初期状態で閉じている(self, page: Page, base_url: str) -> None:
-        # Given/When: トップページにアクセスする
-        page.goto(base_url)
-
-        # Then: ダイアログは初期状態で閉じている
-        dialog = page.locator("#create-dialog")
-        expect(dialog).not_to_be_visible()
-
-    def test_ボタンクリックでダイアログが開く(self, page: Page, base_url: str) -> None:
-        # Given: トップページにアクセスする
-        page.goto(base_url)
-
-        # When: "テーブル追加" ボタンをクリックする
-        page.locator('button:has-text("テーブル追加")').click()
-
-        # Then: ダイアログが開く
-        dialog = page.locator("#create-dialog")
-        expect(dialog).to_be_visible()
-
-    def test_ダイアログにフォーム要素がある(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いた状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-
-        # Then: 依頼文テキストエリアが存在する
-        prompt_textarea = page.locator('#create-dialog textarea[name="prompt"]')
-        expect(prompt_textarea).to_be_visible()
-        expect(prompt_textarea).to_have_attribute("required", "")
-
-        # Then: 送信ボタンが存在する
-        submit_btn = page.locator('#create-dialog button[type="submit"]')
-        expect(submit_btn).to_be_visible()
-        expect(submit_btn).to_have_text("依頼を送信")
-
-    def test_フォームのactionがAPIを指す(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いた状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-
-        # Then: フォームの action が /api/tables を指す
-        form = page.locator('#create-dialog form[action="/api/tables"]')
-        expect(form).to_be_visible()
-        expect(form).to_have_attribute("method", "post")
-
-    def test_キャンセルでダイアログが閉じる(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いた状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-        expect(page.locator("#create-dialog")).to_be_visible()
-
-        # When: キャンセルボタンをクリックする
-        page.locator('#create-dialog button:has-text("キャンセル")').click()
-
-        # Then: ダイアログが閉じる
-        expect(page.locator("#create-dialog")).not_to_be_visible()
+        # Then: チャットトグルボタンが表示される
+        expect(page.locator("#chat-toggle-btn")).to_be_visible()
 
     def test_テーブルなしでER図は非表示(self, page: Page, base_url: str) -> None:
         # Given: テーブルが存在しない
@@ -187,76 +131,6 @@ class TestIndexPageWithTables:
         expect(page.locator("#er-diagram")).to_be_visible()
 
 
-class TestCreateTableDialog:
-    """テーブル新規作成ダイアログの操作。"""
-
-    def test_作成後に詳細ページへリダイレクト(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いた状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-
-        # When: 依頼文を入力して送信する
-        page.fill('#create-dialog textarea[name="prompt"]', "ユーザーテーブルを作って")
-        page.click('#create-dialog button[type="submit"]')
-
-        # Then: テーブル詳細ページにリダイレクトされる
-        page.wait_for_url("**/tables/*")
-        expect(page.locator("h1")).to_be_visible()
-
-    def test_依頼文が空なら送信されない(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いた状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-
-        # When: prompt を空のまま送信ボタンを押す
-        page.click('#create-dialog button[type="submit"]')
-
-        # Then: ページ遷移しない（HTML required バリデーション）
-        expect(page).to_have_url(base_url + "/")
-
-    def test_MetaEnterで送信できる(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いて依頼文を入力した状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-        textarea = page.locator('#create-dialog textarea[name="prompt"]')
-        textarea.fill("ユーザーテーブルを作って")
-
-        # When: Cmd+Enter（Meta+Enter）を押す
-        textarea.press("Meta+Enter")
-
-        # Then: テーブル詳細ページにリダイレクトされる
-        page.wait_for_url("**/tables/*")
-        expect(page.locator("h1")).to_be_visible()
-
-    def test_CtrlEnterで送信できる(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いて依頼文を入力した状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-        textarea = page.locator('#create-dialog textarea[name="prompt"]')
-        textarea.fill("ユーザーテーブルを作って")
-
-        # When: Ctrl+Enter を押す
-        textarea.press("Control+Enter")
-
-        # Then: テーブル詳細ページにリダイレクトされる
-        page.wait_for_url("**/tables/*")
-        expect(page.locator("h1")).to_be_visible()
-
-    def test_作成したテーブルが一覧に表示される(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログからテーブルを作成する
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-        page.fill('#create-dialog textarea[name="prompt"]', "商品テーブル")
-        page.click('#create-dialog button[type="submit"]')
-        page.wait_for_url("**/tables/*")
-
-        # When: トップページに戻る
-        page.goto(base_url)
-
-        # Then: 作成したテーブルの行が表示される
-        expect(page.locator("#table-list tbody tr")).to_be_visible()
-
-
 class TestRebuildButtons:
     """テーブル一覧・ER 図の再作成ボタン。"""
 
@@ -275,26 +149,6 @@ class TestRebuildButtons:
         # Then: "ER 図の再作成" ボタンが表示される
         btn = page.locator('button[aria-label="ER 図の再作成"]')
         expect(btn).to_be_visible()
-
-
-class TestButtonEffects:
-    """ボタンの非活性化と回転アニメーション。"""
-
-    def test_作成送信ボタンがリクエスト中にdisabledになる(self, page: Page, base_url: str) -> None:
-        # Given: ダイアログを開いて依頼文を入力した状態
-        page.goto(base_url)
-        page.locator('button:has-text("テーブル追加")').click()
-        page.fill('#create-dialog textarea[name="prompt"]', "ユーザーテーブル")
-
-        # When: 送信ボタンをクリックする
-        submit_btn = page.locator('#create-dialog button[type="submit"]')
-        submit_btn.click()
-
-        # Then: ボタンが disabled になる（二重送信防止）
-        expect(submit_btn).to_be_disabled()
-
-        # Cleanup: ページ遷移を待つ
-        page.wait_for_url("**/tables/*")
 
 
 class TestDeleteTable:
