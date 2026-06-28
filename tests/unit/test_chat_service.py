@@ -4,7 +4,7 @@ import logging
 import pytest
 
 from app import chat_service
-from app.models import ChatAction, IndexDocument, TableSummary
+from app.models import ChatAction, IndexDocument, TableSummary, ToonDocument
 from tests.conftest import SAMPLE_CORE_TOON, make_fake_openai_client
 
 
@@ -201,6 +201,36 @@ class TestApplyTableActions:
 
         # Assert
         assert "テーブル作成: table=stub_table" in caplog.text
+
+    def test_途中失敗時に作成済みテーブルをロールバックする(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Arrange — 2 番目のブロックで失敗するようにする
+        from app import table_service
+
+        call_count = 0
+        original_save = table_service.save_table
+
+        def save_that_fails_on_second(name: str, doc: ToonDocument) -> None:
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("保存失敗")
+            original_save(name, doc)
+
+        monkeypatch.setattr("app.chat_service.table_service.save_table", save_that_fails_on_second)
+
+        second_toon = SAMPLE_CORE_TOON.replace("stub_table", "second_table").replace(
+            "スタブ", "2番"
+        )
+        index = IndexDocument(description="", rules=[], tables=[], er_diagram="")
+
+        # Act
+        with caplog.at_level(logging.WARNING), pytest.raises(RuntimeError, match="保存失敗"):
+            chat_service.apply_table_actions([SAMPLE_CORE_TOON, second_toon], index)
+
+        # Assert — 1 番目のテーブルがロールバックされている
+        assert "ロールバック: table=stub_table" in caplog.text
 
     def test_既存テーブルのTOONブロックで更新する(self) -> None:
         # Arrange — 先に既存テーブルを作成

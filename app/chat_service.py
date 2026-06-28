@@ -220,27 +220,37 @@ def apply_table_actions(toon_blocks: list[str], index: IndexDocument) -> list[Ch
     """
     actions: list[ChatAction] = []
     existing_names = {t.name for t in index.tables}
+    created_names: list[str] = []
 
-    for block in toon_blocks:
-        docs = parse_toon_tables(block)
-        for doc in docs:
-            name = doc.meta.physical_name
-            if name in existing_names:
-                current = table_service.get_table(name)
-                doc = doc.model_copy(
-                    update={"meta": doc.meta.model_copy(update={"symbol": current.meta.symbol})}
-                )
-                doc = derive_all(doc)
-                table_service.save_table(name, doc)
-                actions.append(ChatAction(type="update_table", table_name=name))
-                logger.info("テーブル更新: table=%s", name)
-            else:
-                sym = symbol_service.allocate_table_symbol()
-                doc = doc.model_copy(update={"meta": doc.meta.model_copy(update={"symbol": sym})})
-                doc = derive_all(doc)
-                table_service.save_table(name, doc)
-                actions.append(ChatAction(type="create_table", table_name=name))
-                logger.info("テーブル作成: table=%s symbol=%s", name, sym)
+    try:
+        for block in toon_blocks:
+            docs = parse_toon_tables(block)
+            for doc in docs:
+                name = doc.meta.physical_name
+                if name in existing_names:
+                    current = table_service.get_table(name)
+                    doc = doc.model_copy(
+                        update={"meta": doc.meta.model_copy(update={"symbol": current.meta.symbol})}
+                    )
+                    doc = derive_all(doc)
+                    table_service.save_table(name, doc)
+                    actions.append(ChatAction(type="update_table", table_name=name))
+                    logger.info("テーブル更新: table=%s", name)
+                else:
+                    sym = symbol_service.allocate_table_symbol()
+                    doc = doc.model_copy(
+                        update={"meta": doc.meta.model_copy(update={"symbol": sym})}
+                    )
+                    doc = derive_all(doc)
+                    table_service.save_table(name, doc)
+                    created_names.append(name)
+                    actions.append(ChatAction(type="create_table", table_name=name))
+                    logger.info("テーブル作成: table=%s symbol=%s", name, sym)
+    except Exception:
+        for name in created_names:
+            table_service.delete_table(name)
+            logger.warning("ロールバック: table=%s", name)
+        raise
 
     if actions:
         table_service.rebuild_index()
