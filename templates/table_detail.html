@@ -22,11 +22,4 @@
 <div id="physical" style="display:none;">{{ physical | dict_table_html | safe }}</div>
 <div id="dao" style="display:none;">{{ dao | dict_table_html | safe }}</div>
 
-<h2>AI に更新を依頼</h2>
-<form method="post" action="/api/tables/{{ name }}"
-      hx-post="/api/tables/{{ name }}"
-      hx-disabled-elt="find button[type='submit']">
-  <textarea name="prompt" rows="3" placeholder="変更内容を説明してください"></textarea>
-  <button type="submit">更新を依頼</button>
-</form>
 {% endblock %}

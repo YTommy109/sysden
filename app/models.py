@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -41,3 +43,21 @@ class IndexDocument(BaseModel):
     rules: list[str]
     tables: list[TableSummary]
     er_diagram: str
+
+
+class ChatAction(BaseModel):
+    type: Literal["create_table", "update_table"]
+    table_name: str
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    timestamp: str = ""
+    actions: list[ChatAction] = []
+
+
+class Conversation(BaseModel):
+    id: str
+    created_at: str
+    messages: list[ChatMessage] = []

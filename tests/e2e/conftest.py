@@ -64,11 +64,15 @@ def base_url(e2e_server: str) -> str:
 
 @pytest.fixture(autouse=True)
 def clean_data(e2e_data_dir: Path) -> None:
-    """各テスト前にデータディレクトリの TOON ファイルを削除する。"""
+    """各テスト前にデータディレクトリの TOON ファイルとチャットデータを削除する。"""
     for f in e2e_data_dir.glob("*.toon"):
         f.unlink()
     for f in e2e_data_dir.glob("*.yaml"):
         f.unlink()
+    chat_dir = e2e_data_dir / "chat"
+    if chat_dir.exists():
+        for f in chat_dir.iterdir():
+            f.unlink()
 
 
 @pytest.fixture()
