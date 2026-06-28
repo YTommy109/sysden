@@ -143,10 +143,8 @@ class TestIdentifyRelevantTables:
         # Assert
         assert result == ["users", "orders"]
 
-    def test_テーブル操作なしなら空リストを返す(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_テーブル操作なしなら空リストを返す(self) -> None:
         # Arrange
-        fake = make_fake_openai_client(response="[]")
-        monkeypatch.setattr("app.chat_service.ai_service.get_client", lambda: fake)
         index = IndexDocument(description="", rules=[], tables=[], er_diagram="")
 
         # Act
@@ -191,6 +189,7 @@ class TestApplyTableActions:
         # Assert
         assert len(actions) == 1
         assert actions[0].type == "update_table"
+        assert actions[0].table_name == "stub_table"
 
 
 class TestGenerateResponseStream:

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 _META_LINE_RE = re.compile(r"^meta:\s*$", re.MULTILINE)
 _PROMPTS_PATH = Path(__file__).parent.parent / "prompts" / "ai_prompts.yaml"
 _STREAM_TRUE: Literal[True] = True
+_STREAM_SENTINEL = object()
 
 _STUB_CHAT_RESPONSE = """\
 テスト用テーブルを作成します。
@@ -298,7 +299,11 @@ async def generate_response_stream(
         temperature=config["temperature"],
         stream=_STREAM_TRUE,
     )
-    for chunk in stream:
+    stream_iter = iter(stream)
+    while True:
+        chunk: Any = await asyncio.to_thread(next, stream_iter, _STREAM_SENTINEL)
+        if chunk is _STREAM_SENTINEL:
+            break
         delta = chunk.choices[0].delta
         if delta.content:
             yield delta.content
