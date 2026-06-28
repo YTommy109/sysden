@@ -5,3 +5,4 @@
 htmlcov/**
 .coverage
 .env
+.ruff_cache/**
